@@ -1,0 +1,22 @@
+event_type,category,description,changes_score,counts_as_shot,counts_as_shot_on_target,requires_player,related_player_rule,allowed_outcomes
+KICK_OFF,MATCH_FLOW,Match kick-off. No team or player.,false,false,false,false,NONE,NONE
+PASS,POSSESSION,"Sampled pass. player=passer; related=receiver when COMPLETE. The log is a sample, not every pass.",false,false,false,true,SAME_TEAM_OPTIONAL,COMPLETE|INCOMPLETE
+SHOT,ATTACK,Shot blocked before reaching the goal frame.,false,true,false,true,NONE,BLOCKED
+SHOT_ON_TARGET,ATTACK,Shot on target that did not score; followed by a SAVE.,false,true,true,true,NONE,SAVED
+SHOT_OFF_TARGET,ATTACK,Shot that missed the goal frame.,false,true,false,true,NONE,OFF_TARGET
+SAVE,DEFENCE,Goalkeeper save. team=keeper's team; player=keeper; related=shooter (opposing).,false,false,false,true,OPPOSING_TEAM,SAVED
+GOAL,SCORING,Valid open-play or set-piece goal. related=assisting player when a preceding PASS event supports it.,true,true,true,true,SAME_TEAM_OPTIONAL,SCORED
+OWN_GOAL,SCORING,"Own goal. team/player=the culprit's side; credited_team_id=the opposing team, which receives the score.",true,false,false,true,NONE,SCORED
+PENALTY_AWARDED,SET_PIECE,Penalty awarded. team=awarded team; player=fouled player; related=fouling player (opposing).,false,false,false,true,OPPOSING_TEAM,AWARDED
+PENALTY_SCORED,SCORING,Converted penalty. Changes the score.,true,true,true,true,NONE,SCORED
+PENALTY_MISSED,ATTACK,Missed penalty. SAVED outcome is followed by a SAVE event.,false,true,outcome_saved,true,NONE,SAVED|OFF_TARGET
+GOAL_DISALLOWED,SCORING_REVIEW,"Goal ruled out. Never changes the score. is_disallowed=true, is_goal=false.",false,false,false,true,SAME_TEAM_OPTIONAL,DISALLOWED
+FOUL,DISCIPLINE,Foul. team/player=offender; related=fouled player (opposing).,false,false,false,true,OPPOSING_TEAM,COMMITTED
+YELLOW_CARD,DISCIPLINE,Caution shown to player.,false,false,false,true,NONE,CAUTION
+RED_CARD,DISCIPLINE,Straight red card. Player cannot appear again and is not replaced.,false,false,false,true,NONE,SENT_OFF
+CORNER,SET_PIECE,Corner kick taken by player.,false,false,false,true,NONE,AWARDED
+OFFSIDE,STOPPAGE,Offside called against player's team.,false,false,false,true,NONE,CALLED
+SUBSTITUTION,SQUAD,player=outgoing player; related=incoming player (same team).,false,false,false,true,SAME_TEAM,COMPLETED
+HALF_TIME,MATCH_FLOW,End of first half after stoppage time.,false,false,false,false,NONE,NONE
+SECOND_HALF_START,MATCH_FLOW,Second half kicks off (same elapsed timestamp as HALF_TIME).,false,false,false,false,NONE,NONE
+FULL_TIME,MATCH_FLOW,Final whistle after second-half stoppage time.,false,false,false,false,NONE,NONE

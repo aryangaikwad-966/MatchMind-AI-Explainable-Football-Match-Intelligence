@@ -1,0 +1,646 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MatchMind AI synthetic football dataset contract",
+  "dataset_id": "matchmind-synthetic-v1",
+  "data_version": "1.0.0",
+  "is_synthetic": true,
+  "encoding": "UTF-8",
+  "csv": {
+    "delimiter": ",",
+    "quote": "\"",
+    "line_terminator": "\\n",
+    "booleans": "true|false",
+    "empty_means": "not applicable"
+  },
+  "conventions": {
+    "timestamp_seconds": "Elapsed playing seconds. Half-time break excluded, stoppage included.",
+    "minute": "Elapsed minute (timestamp_seconds // 60). Use display_clock for broadcast style.",
+    "starters": "squad_number 1-11 start every match; 12-18 are substitutes.",
+    "score_rule": "A valid scoring event is is_goal=true and is_disallowed=false. GOAL and PENALTY_SCORED credit team_id; OWN_GOAL credits credited_team_id (the opponent).",
+    "own_goal": "OWN_GOAL team_id/player_id is the culprit's side; credited_team_id receives the goal.",
+    "sampling": "events.csv is a sampled event log: passes are not exhaustive, so possession and pass accuracy cannot be derived."
+  },
+  "files": {
+    "matches.csv": {
+      "primary_key": [
+        "match_id"
+      ],
+      "fields": [
+        {
+          "name": "match_id",
+          "type": "string",
+          "required": true,
+          "description": "Stable unique match id, e.g. SYN-M001."
+        },
+        {
+          "name": "dataset_id",
+          "type": "string",
+          "required": true,
+          "description": "Dataset identifier; always matchmind-synthetic-v1."
+        },
+        {
+          "name": "is_synthetic",
+          "type": "boolean",
+          "required": true,
+          "description": "Always true."
+        },
+        {
+          "name": "home_team_id",
+          "type": "string",
+          "required": true,
+          "description": "References teams.csv."
+        },
+        {
+          "name": "away_team_id",
+          "type": "string",
+          "required": true,
+          "description": "References teams.csv; must differ from home_team_id."
+        },
+        {
+          "name": "home_team_name",
+          "type": "string",
+          "required": true,
+          "description": "Fictional club name."
+        },
+        {
+          "name": "away_team_name",
+          "type": "string",
+          "required": true,
+          "description": "Fictional club name."
+        },
+        {
+          "name": "competition_name",
+          "type": "string",
+          "required": true,
+          "description": "Invented competition: Synthetic Football Showcase."
+        },
+        {
+          "name": "season_label",
+          "type": "string",
+          "required": true,
+          "description": "Invented season label."
+        },
+        {
+          "name": "match_date",
+          "type": "date",
+          "required": true,
+          "description": "ISO-8601 date (YYYY-MM-DD)."
+        },
+        {
+          "name": "scheduled_duration_minutes",
+          "type": "integer",
+          "required": true,
+          "description": "Regulation length, 90."
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "description": "Match status.",
+          "enum": [
+            "COMPLETED"
+          ]
+        },
+        {
+          "name": "home_score",
+          "type": "integer",
+          "required": true,
+          "description": "Final home score, derived from valid scoring events."
+        },
+        {
+          "name": "away_score",
+          "type": "integer",
+          "required": true,
+          "description": "Final away score, derived from valid scoring events."
+        },
+        {
+          "name": "scenario_type",
+          "type": "string",
+          "required": true,
+          "description": "Generation target label. Not evidence.",
+          "enum": [
+            "LATE_COMEBACK_VICTORY",
+            "NARROW_LATE_WINNER",
+            "RED_CARD_TACTICAL_SHIFT",
+            "GOALLESS_DRAW_WITH_CHANCES",
+            "HIGH_SCORING_MOMENTUM_SWINGS",
+            "EARLY_GOAL_DEFENSIVE_HOLD",
+            "TWO_LATE_GOALS_CLOSE_MATCH",
+            "PENALTY_GOAL_AND_RESPONSE",
+            "DISALLOWED_GOAL",
+            "SUBSTITUTION_DECISIVE_SEQUENCE",
+            "UNDERDOG_VICTORY",
+            "EARLY_LEAD_EQUALIZER_LATE_WINNER"
+          ]
+        },
+        {
+          "name": "data_version",
+          "type": "string",
+          "required": true,
+          "description": "Dataset version."
+        },
+        {
+          "name": "first_half_stoppage_minutes",
+          "type": "integer",
+          "required": true,
+          "description": "Whole minutes of first-half stoppage; equals (HALF_TIME timestamp - 2700) / 60."
+        },
+        {
+          "name": "second_half_stoppage_minutes",
+          "type": "integer",
+          "required": true,
+          "description": "Whole minutes of second-half stoppage; equals (FULL_TIME timestamp - HALF_TIME timestamp - 2700) / 60."
+        }
+      ]
+    },
+    "events.csv": {
+      "primary_key": [
+        "event_id"
+      ],
+      "fields": [
+        {
+          "name": "event_id",
+          "type": "string",
+          "required": true,
+          "description": "Stable unique id: <match_id>-E<sequence>."
+        },
+        {
+          "name": "dataset_id",
+          "type": "string",
+          "required": true,
+          "description": "Dataset identifier."
+        },
+        {
+          "name": "match_id",
+          "type": "string",
+          "required": true,
+          "description": "References matches.csv."
+        },
+        {
+          "name": "event_sequence",
+          "type": "integer",
+          "required": true,
+          "description": "1..N contiguous per match, in chronological order."
+        },
+        {
+          "name": "minute",
+          "type": "integer",
+          "required": true,
+          "description": "ELAPSED playing minute = timestamp_seconds // 60 (continuous across stoppage; NOT the broadcast clock)."
+        },
+        {
+          "name": "second",
+          "type": "integer",
+          "required": true,
+          "description": "timestamp_seconds % 60."
+        },
+        {
+          "name": "display_clock",
+          "type": "string",
+          "required": true,
+          "description": "Broadcast-style label such as 45+2' or 90+3', derived from period and elapsed time."
+        },
+        {
+          "name": "period",
+          "type": "string",
+          "required": true,
+          "description": "Half the event belongs to.",
+          "enum": [
+            "FIRST_HALF",
+            "SECOND_HALF"
+          ]
+        },
+        {
+          "name": "timestamp_seconds",
+          "type": "integer",
+          "required": true,
+          "description": "Elapsed playing seconds since kick-off. Half-time break is not counted; stoppage time is."
+        },
+        {
+          "name": "event_type",
+          "type": "string",
+          "required": true,
+          "description": "See event_types.csv.",
+          "enum": [
+            "KICK_OFF",
+            "PASS",
+            "SHOT",
+            "SHOT_ON_TARGET",
+            "SHOT_OFF_TARGET",
+            "SAVE",
+            "GOAL",
+            "OWN_GOAL",
+            "PENALTY_AWARDED",
+            "PENALTY_SCORED",
+            "PENALTY_MISSED",
+            "GOAL_DISALLOWED",
+            "FOUL",
+            "YELLOW_CARD",
+            "RED_CARD",
+            "CORNER",
+            "OFFSIDE",
+            "SUBSTITUTION",
+            "HALF_TIME",
+            "SECOND_HALF_START",
+            "FULL_TIME"
+          ]
+        },
+        {
+          "name": "event_outcome",
+          "type": "string",
+          "required": true,
+          "description": "Outcome enum; allowed values depend on event_type.",
+          "enum": [
+            "COMPLETE",
+            "INCOMPLETE",
+            "BLOCKED",
+            "SAVED",
+            "OFF_TARGET",
+            "SCORED",
+            "AWARDED",
+            "DISALLOWED",
+            "COMMITTED",
+            "CAUTION",
+            "SENT_OFF",
+            "CALLED",
+            "COMPLETED",
+            "NONE"
+          ]
+        },
+        {
+          "name": "team_id",
+          "type": "string",
+          "required": false,
+          "description": "Team of player_id. Empty for match-flow events."
+        },
+        {
+          "name": "team_name",
+          "type": "string",
+          "required": false,
+          "description": "Team name matching teams.csv."
+        },
+        {
+          "name": "player_id",
+          "type": "string",
+          "required": false,
+          "description": "References players.csv. Empty for match-flow events."
+        },
+        {
+          "name": "player_name",
+          "type": "string",
+          "required": false,
+          "description": "Player name matching players.csv."
+        },
+        {
+          "name": "related_player_id",
+          "type": "string",
+          "required": false,
+          "description": "Second participant; meaning per event type (see event_types.csv)."
+        },
+        {
+          "name": "related_player_name",
+          "type": "string",
+          "required": false,
+          "description": "Name matching players.csv."
+        },
+        {
+          "name": "credited_team_id",
+          "type": "string",
+          "required": false,
+          "description": "Team credited with the score for GOAL, PENALTY_SCORED and OWN_GOAL (opposing team of the culprit). Empty otherwise."
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true,
+          "description": "Neutral factual description of the single event. Contains no causal or analytical claims."
+        },
+        {
+          "name": "is_goal",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for valid scoring events: GOAL, OWN_GOAL, PENALTY_SCORED."
+        },
+        {
+          "name": "is_own_goal",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for OWN_GOAL."
+        },
+        {
+          "name": "is_penalty",
+          "type": "boolean",
+          "required": true,
+          "description": "True for PENALTY_AWARDED, PENALTY_SCORED, PENALTY_MISSED."
+        },
+        {
+          "name": "is_red_card",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for RED_CARD."
+        },
+        {
+          "name": "is_yellow_card",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for YELLOW_CARD."
+        },
+        {
+          "name": "is_substitution",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for SUBSTITUTION."
+        },
+        {
+          "name": "is_disallowed",
+          "type": "boolean",
+          "required": true,
+          "description": "True only for GOAL_DISALLOWED (never changes the score)."
+        },
+        {
+          "name": "score_home_after_event",
+          "type": "integer",
+          "required": true,
+          "description": "Home score after applying this event."
+        },
+        {
+          "name": "score_away_after_event",
+          "type": "integer",
+          "required": true,
+          "description": "Away score after applying this event."
+        },
+        {
+          "name": "source_type",
+          "type": "string",
+          "required": true,
+          "description": "Provenance of the record.",
+          "enum": [
+            "SYNTHETIC_OBSERVED"
+          ]
+        },
+        {
+          "name": "synthetic_event_group_id",
+          "type": "string",
+          "required": false,
+          "description": "Generation metadata grouping a generated sequence. NOT proof of causality."
+        },
+        {
+          "name": "scenario_tag",
+          "type": "string",
+          "required": true,
+          "description": "Generation metadata. Must not drive analysis results."
+        },
+        {
+          "name": "data_quality_flag",
+          "type": "string",
+          "required": true,
+          "description": "Record quality marker.",
+          "enum": [
+            "OK"
+          ]
+        }
+      ]
+    },
+    "teams.csv": {
+      "primary_key": [
+        "team_id"
+      ],
+      "fields": [
+        {
+          "name": "team_id",
+          "type": "string",
+          "required": true,
+          "description": "Stable id, e.g. T-NBR."
+        },
+        {
+          "name": "team_name",
+          "type": "string",
+          "required": true,
+          "description": "Fictional club name."
+        },
+        {
+          "name": "short_name",
+          "type": "string",
+          "required": true,
+          "description": "Three-letter code."
+        },
+        {
+          "name": "home_ground",
+          "type": "string",
+          "required": true,
+          "description": "Fictional ground name."
+        },
+        {
+          "name": "synthetic_seed_rank",
+          "type": "integer",
+          "required": true,
+          "description": "Fictional pre-season seeding 1-10 used only as generation context (e.g. underdog scenario). Not a performance statistic."
+        },
+        {
+          "name": "is_synthetic",
+          "type": "boolean",
+          "required": true,
+          "description": "Always true."
+        },
+        {
+          "name": "dataset_id",
+          "type": "string",
+          "required": true,
+          "description": "Dataset identifier."
+        }
+      ]
+    },
+    "players.csv": {
+      "primary_key": [
+        "player_id"
+      ],
+      "fields": [
+        {
+          "name": "player_id",
+          "type": "string",
+          "required": true,
+          "description": "Synthetic id, e.g. P-NBR-09."
+        },
+        {
+          "name": "player_name",
+          "type": "string",
+          "required": true,
+          "description": "Invented name."
+        },
+        {
+          "name": "team_id",
+          "type": "string",
+          "required": true,
+          "description": "References teams.csv."
+        },
+        {
+          "name": "squad_number",
+          "type": "integer",
+          "required": true,
+          "description": "1-18. Numbers 1-11 are starters in every match; 12-18 are the bench."
+        },
+        {
+          "name": "position",
+          "type": "string",
+          "required": true,
+          "description": "Nominal position.",
+          "enum": [
+            "GK",
+            "DEF",
+            "MID",
+            "FWD"
+          ]
+        },
+        {
+          "name": "is_synthetic",
+          "type": "boolean",
+          "required": true,
+          "description": "Always true."
+        },
+        {
+          "name": "dataset_id",
+          "type": "string",
+          "required": true,
+          "description": "Dataset identifier."
+        }
+      ]
+    },
+    "match_scenarios.csv": {
+      "primary_key": [
+        "match_id"
+      ],
+      "fields": [
+        {
+          "name": "match_id",
+          "type": "string",
+          "required": true,
+          "description": "References matches.csv."
+        },
+        {
+          "name": "scenario_type",
+          "type": "string",
+          "required": true,
+          "description": "Generation target label.",
+          "enum": [
+            "LATE_COMEBACK_VICTORY",
+            "NARROW_LATE_WINNER",
+            "RED_CARD_TACTICAL_SHIFT",
+            "GOALLESS_DRAW_WITH_CHANCES",
+            "HIGH_SCORING_MOMENTUM_SWINGS",
+            "EARLY_GOAL_DEFENSIVE_HOLD",
+            "TWO_LATE_GOALS_CLOSE_MATCH",
+            "PENALTY_GOAL_AND_RESPONSE",
+            "DISALLOWED_GOAL",
+            "SUBSTITUTION_DECISIVE_SEQUENCE",
+            "UNDERDOG_VICTORY",
+            "EARLY_LEAD_EQUALIZER_LATE_WINNER"
+          ]
+        },
+        {
+          "name": "intended_narrative",
+          "type": "string",
+          "required": true,
+          "description": "What the generator aimed for."
+        },
+        {
+          "name": "generation_target",
+          "type": "string",
+          "required": true,
+          "description": "Scripted targets (not evidence; the events are authoritative)."
+        },
+        {
+          "name": "home_seed_rank",
+          "type": "integer",
+          "required": true,
+          "description": "Fictional seeding of home team."
+        },
+        {
+          "name": "away_seed_rank",
+          "type": "integer",
+          "required": true,
+          "description": "Fictional seeding of away team."
+        },
+        {
+          "name": "evidence_note",
+          "type": "string",
+          "required": true,
+          "description": "Reminder that analysis must derive from events.csv."
+        }
+      ]
+    },
+    "event_types.csv": {
+      "primary_key": [
+        "event_type"
+      ],
+      "fields": [
+        {
+          "name": "event_type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "changes_score",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "counts_as_shot",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "counts_as_shot_on_target",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "requires_player",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "related_player_rule",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "allowed_outcomes",
+          "type": "string",
+          "required": true
+        }
+      ]
+    }
+  },
+  "fixtures": {
+    "late_comeback.csv": {
+      "match_id": "SYN-M001",
+      "note": "Complete event set of one match; rows identical to events.csv."
+    },
+    "late_winner.csv": {
+      "match_id": "SYN-M002",
+      "note": "Complete event set of one match; rows identical to events.csv."
+    },
+    "red_card_turning_point.csv": {
+      "match_id": "SYN-M003",
+      "note": "Complete event set of one match; rows identical to events.csv."
+    },
+    "goalless_draw.csv": {
+      "match_id": "SYN-M004",
+      "note": "Complete event set of one match; rows identical to events.csv."
+    },
+    "high_scoring_match.csv": {
+      "match_id": "SYN-M005",
+      "note": "Complete event set of one match; rows identical to events.csv."
+    }
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "dataset_id": "matchmind-synthetic-v1",
+  "data_version": "1.0.0",
+  "generated_at": "2026-10-15T00:00:00Z",
+  "valid": true,
+  "totals": {
+    "matches": 12,
+    "events": 1262,
+    "teams": 10,
+    "players": 180
+  },
+  "events_by_type": {
+    "CORNER": 115,
+    "FOUL": 175,
+    "FULL_TIME": 12,
+    "GOAL": 29,
+    "GOAL_DISALLOWED": 1,
+    "HALF_TIME": 12,
+    "KICK_OFF": 12,
+    "OFFSIDE": 48,
+    "OWN_GOAL": 1,
+    "PASS": 385,
+    "PENALTY_AWARDED": 2,
+    "PENALTY_MISSED": 1,
+    "PENALTY_SCORED": 1,
+    "RED_CARD": 1,
+    "SAVE": 112,
+    "SECOND_HALF_START": 12,
+    "SHOT": 46,
+    "SHOT_OFF_TARGET": 103,
+    "SHOT_ON_TARGET": 111,
+    "SUBSTITUTION": 45,
+    "YELLOW_CARD": 38
+  },
+  "events_per_match": {
+    "SYN-M001": 112,
+    "SYN-M002": 98,
+    "SYN-M003": 104,
+    "SYN-M004": 106,
+    "SYN-M005": 126,
+    "SYN-M006": 96,
+    "SYN-M007": 100,
+    "SYN-M008": 102,
+    "SYN-M009": 108,
+    "SYN-M010": 104,
+    "SYN-M011": 100,
+    "SYN-M012": 106
+  },
+  "final_scores": {
+    "SYN-M001": {
+      "home_team": "Northbridge FC",
+      "away_team": "Kingsford United",
+      "recomputed_score": "3-2",
+      "matches_csv_score": "3-2"
+    },
+    "SYN-M002": {
+      "home_team": "Westhaven Athletic",
+      "away_team": "Redmont City",
+      "recomputed_score": "1-0",
+      "matches_csv_score": "1-0"
+    },
+    "SYN-M003": {
+      "home_team": "Eastmere Rovers",
+      "away_team": "Ashbourne FC",
+      "recomputed_score": "2-1",
+      "matches_csv_score": "2-1"
+    },
+    "SYN-M004": {
+      "home_team": "Silvergate Town",
+      "away_team": "Brookfield United",
+      "recomputed_score": "0-0",
+      "matches_csv_score": "0-0"
+    },
+    "SYN-M005": {
+      "home_team": "Stonehaven Albion",
+      "away_team": "Cresswick Rangers",
+      "recomputed_score": "4-3",
+      "matches_csv_score": "4-3"
+    },
+    "SYN-M006": {
+      "home_team": "Ashbourne FC",
+      "away_team": "Stonehaven Albion",
+      "recomputed_score": "1-0",
+      "matches_csv_score": "1-0"
+    },
+    "SYN-M007": {
+      "home_team": "Brookfield United",
+      "away_team": "Westhaven Athletic",
+      "recomputed_score": "2-0",
+      "matches_csv_score": "2-0"
+    },
+    "SYN-M008": {
+      "home_team": "Cresswick Rangers",
+      "away_team": "Redmont City",
+      "recomputed_score": "1-1",
+      "matches_csv_score": "1-1"
+    },
+    "SYN-M009": {
+      "home_team": "Northbridge FC",
+      "away_team": "Silvergate Town",
+      "recomputed_score": "2-1",
+      "matches_csv_score": "2-1"
+    },
+    "SYN-M010": {
+      "home_team": "Eastmere Rovers",
+      "away_team": "Kingsford United",
+      "recomputed_score": "2-0",
+      "matches_csv_score": "2-0"
+    },
+    "SYN-M011": {
+      "home_team": "Westhaven Athletic",
+      "away_team": "Cresswick Rangers",
+      "recomputed_score": "0-2",
+      "matches_csv_score": "0-2"
+    },
+    "SYN-M012": {
+      "home_team": "Kingsford United",
+      "away_team": "Silvergate Town",
+      "recomputed_score": "2-1",
+      "matches_csv_score": "2-1"
+    }
+  },
+  "passed_checks": [
+    {
+      "id": "V01",
+      "name": "required files exist",
+      "severity": "critical"
+    },
+    {
+      "id": "V02",
+      "name": "csv headers and row widths match schema",
+      "severity": "critical"
+    },
+    {
+      "id": "V03",
+      "name": "enum, boolean and integer values valid",
+      "severity": "critical"
+    },
+    {
+      "id": "V04",
+      "name": "dataset id, synthetic flag and version consistent",
+      "severity": "critical"
+    },
+    {
+      "id": "V05",
+      "name": "unique match ids and event ids",
+      "severity": "critical"
+    },
+    {
+      "id": "V06",
+      "name": "match team references valid and home differs from away",
+      "severity": "critical"
+    },
+    {
+      "id": "V07",
+      "name": "events reference existing matches; 80-130 events per match",
+      "severity": "critical"
+    },
+    {
+      "id": "V08",
+      "name": "event_sequence unique and contiguous per match",
+      "severity": "critical"
+    },
+    {
+      "id": "V09",
+      "name": "chronology, half boundaries and time fields consistent",
+      "severity": "critical"
+    },
+    {
+      "id": "V10",
+      "name": "team and player references valid and belong to the right team",
+      "severity": "critical"
+    },
+    {
+      "id": "V11",
+      "name": "event flags consistent with event types",
+      "severity": "critical"
+    },
+    {
+      "id": "V12",
+      "name": "score snapshots and final scores reconstruct from valid goals",
+      "severity": "critical"
+    },
+    {
+      "id": "V13",
+      "name": "disallowed goals do not change the score",
+      "severity": "critical"
+    },
+    {
+      "id": "V14",
+      "name": "own goals credited to the opposing team",
+      "severity": "critical"
+    },
+    {
+      "id": "V15",
+      "name": "penalty sequences and outcomes consistent",
+      "severity": "critical"
+    },
+    {
+      "id": "V16",
+      "name": "red cards, yellow cards and substitutions consistent with on-pitch players",
+      "severity": "critical"
+    },
+    {
+      "id": "V17",
+      "name": "saves follow a matching on-target shot or saved penalty",
+      "severity": "critical"
+    },
+    {
+      "id": "V18",
+      "name": "fixtures identical to canonical events",
+      "severity": "critical"
+    },
+    {
+      "id": "V19",
+      "name": "manifest counts and file hashes match",
+      "severity": "critical"
+    },
+    {
+      "id": "V20",
+      "name": "scenario rows consistent with matches",
+      "severity": "critical"
+    },
+    {
+      "id": "V21",
+      "name": "squads and fictional-data markers",
+      "severity": "critical"
+    },
+    {
+      "id": "V22",
+      "name": "scenario label realized by actual events",
+      "severity": "warning"
+    }
+  ],
+  "failed_checks": [],
+  "warnings": [],
+  "summary": {
+    "passed": 22,
+    "failed": 0,
+    "warnings": 0
+  }
+}
