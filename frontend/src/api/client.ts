@@ -52,6 +52,24 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => {
+    if (typeof response.data === 'string' && (
+      response.data.trim().startsWith('<!DOCTYPE') ||
+      response.data.trim().startsWith('<html') ||
+      response.data.includes('<head>')
+    )) {
+      return Promise.reject(new Error(
+        'Server returned HTML page instead of API JSON data. Ensure your backend URL points to your Render backend web service.'
+      ));
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const apiClient = {
   getBaseUrl(): string {
     return getApiBaseUrl();
@@ -70,7 +88,13 @@ export const apiClient = {
   // Matches
   async getMatches(): Promise<Match[]> {
     const response = await api.get('/matches');
-    return response.data;
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data && typeof response.data === 'object' && Array.isArray((response.data as any).matches)) {
+      return (response.data as any).matches;
+    }
+    throw new Error('Invalid match data received from server. Expected array of matches.');
   },
 
   async getMatch(matchId: string): Promise<Match> {
@@ -84,7 +108,7 @@ export const apiClient = {
     filters?: { teamId?: string; eventType?: string; period?: string }
   ): Promise<MatchEvent[]> {
     const response = await api.get(`/matches/${matchId}/events`, { params: filters });
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   // Statistics
@@ -96,7 +120,7 @@ export const apiClient = {
   // Turning Points
   async getTurningPoints(matchId: string): Promise<TurningPoint[]> {
     const response = await api.get(`/matches/${matchId}/turning-points`);
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   // Evidence

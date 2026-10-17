@@ -122,7 +122,8 @@ export default function MatchDetail() {
 
   // Extract goal events for scoreboard goal ticker
   const goalEvents = useMemo(() => {
-    return events.filter(e => e.isGoal && !e.isDisallowed);
+    const safeEvents = Array.isArray(events) ? events : [];
+    return safeEvents.filter(e => e.isGoal && !e.isDisallowed);
   }, [events]);
 
   if (loading) {

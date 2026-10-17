@@ -27,11 +27,14 @@ export default function MatchList() {
         apiClient.getMatches(),
         apiClient.health()
       ]);
+      if (!Array.isArray(matchesData)) {
+        throw new Error('Received unexpected data format from backend. Expected list of matches.');
+      }
       setMatches(matchesData);
-      setAiMode(healthData.aiMode || 'DEMO');
+      setAiMode(healthData?.aiMode || 'DEMO');
       setError(null);
-    } catch (err) {
-      setError('Failed to load matches. Please ensure the backend is running.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load matches. Please ensure the backend is running.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -39,17 +42,19 @@ export default function MatchList() {
   };
 
   const filteredMatches = useMemo(() => {
-    return matches.filter(match => {
+    const safeMatches = Array.isArray(matches) ? matches : [];
+    return safeMatches.filter(match => {
       const matchesSearch =
-        match.homeTeamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        match.awayTeamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        match.competitionName.toLowerCase().includes(searchTerm.toLowerCase());
+        (match.homeTeamName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (match.awayTeamName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (match.competitionName || '').toLowerCase().includes(searchTerm.toLowerCase());
 
+      const scenario = match.scenarioType || '';
       const matchesScenario =
         scenarioFilter === 'ALL' ||
-        (scenarioFilter === 'COMEBACK' && match.scenarioType.includes('COMEBACK')) ||
-        (scenarioFilter === 'RED_CARD' && match.scenarioType.includes('RED_CARD')) ||
-        (scenarioFilter === 'HIGH_SCORING' && match.scenarioType.includes('HIGH_SCORING')) ||
+        (scenarioFilter === 'COMEBACK' && scenario.includes('COMEBACK')) ||
+        (scenarioFilter === 'RED_CARD' && scenario.includes('RED_CARD')) ||
+        (scenarioFilter === 'HIGH_SCORING' && scenario.includes('HIGH_SCORING')) ||
         (scenarioFilter === 'DRAW' && match.homeScore === match.awayScore);
 
       return matchesSearch && matchesScenario;
