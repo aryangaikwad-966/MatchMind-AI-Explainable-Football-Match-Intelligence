@@ -201,78 +201,108 @@ All screenshots below are authentic captures from the running application.
 
 ---
 
+
 ## 8. System Architecture
 
+MatchMind AI separates deterministic match analysis from optional AI-generated
+narratives. The architecture consists of four layers: data ingestion, backend
+processing, REST APIs, and the React frontend.
+
 ```mermaid
-flowchart TD
-    subgraph Data Layer
-        A[Canonical Synthetic Dataset<br>matches.csv, events.csv, teams.csv, players.csv]
-        B[Custom Uploaded CSV<br>Multipart Form Upload]
+flowchart TB
+    subgraph DATA["1. Data Layer"]
+        CSV["Canonical Synthetic Dataset"]
+        UPLOAD["User CSV Upload"]
     end
 
-    subgraph Backend Core [Spring Boot 3.2 Backend - Java 17]
-        C[DatasetLoader<br>Filesystem & Classpath In-Memory Store]
-        D[UploadController<br>Schema, Chronology & Monotonicity Validator]
-        E[MatchAnalysisService<br>Bilateral Statistics & Period Comparisons]
-        F[TurningPoint Engine<br>Weighted Impact Scoring 1-10]
-        G[Replay State Machine<br>Chronological State & Overlay Generator]
-        H[AIService<br>Persona Dispatcher & Function Caller]
-        I[DEMO Engine<br>Deterministic Fallback]
-        J[Gemini REST Client<br>generateContent with Function Declarations]
-        K[Evidence Validator<br>Cryptographic ID Verification]
+    subgraph BACKEND["2. Backend Core — Java 17 + Spring Boot"]
+        LOADER["Dataset Loader"]
+        VALIDATOR["CSV Schema and Sequence Validator"]
+        ANALYSIS["Match Analysis Service"]
+        TURNING["Turning Point Scoring Engine"]
+        REPLAY["Replay State Machine"]
+        AI["AI Service and Persona Dispatcher"]
+        EVIDENCE["Evidence ID Validator"]
     end
 
-    subgraph API Layer [REST Controllers]
-        L[/api/health & /api/matches]
-        M[/api/matches/{id}/statistics]
-        N[/api/matches/{id}/turning-points]
-        O[/api/matches/{id}/replay]
-        P[/api/matches/{id}/recap & /questions]
-        Q[/api/matches/upload]
+    subgraph AI_PATH["3. Narrative Generation"]
+        DEMO["Deterministic DEMO Engine"]
+        GEMINI["Optional Gemini API"]
     end
 
-    subgraph Frontend Application [React 18 + Vite + TypeScript]
-        R[Match Dashboard & Scenario Filters]
-        S[Overview & Half-by-Half Analytics]
-        T[Turning Point Evidence Cards]
-        U[Pitch Replay Player & Overlays]
-        V[Dual Persona Switcher Fan/Analyst]
-        W[Grounded Q&A Console]
-        X[CSV Ingestion Dropzone]
+    subgraph API["4. REST API Layer"]
+        MATCH_API["Match and Statistics APIs"]
+        INSIGHT_API["Turning Points and Evidence APIs"]
+        REPLAY_API["Replay API"]
+        AI_API["Recap and Q&A APIs"]
+        UPLOAD_API["CSV Upload API"]
     end
 
-    A --> C
-    B --> D
-    D -->|Validated Match & Events| C
-    C --> E
-    C --> F
-    C --> G
-    C --> H
-    E --> H
-    F --> H
-    H -->|AI_MODE=DEMO| I
-    H -->|AI_MODE=GEMINI| J
-    J -->|Tool Call Execution| C
-    J -->|Tool Call Execution| E
-    J -->|Tool Call Execution| F
-    J --> K
-    K --> P
-    I --> P
+    subgraph FRONTEND["5. Frontend — React + TypeScript"]
+        DASHBOARD["Match Dashboard"]
+        STATS["Statistics and Momentum"]
+        INSIGHTS["Turning Points and Evidence"]
+        PLAYER["Synthetic Replay and Overlays"]
+        PERSONAS["Fan and Analyst Personas"]
+        QA["Grounded Q&A"]
+        UPLOAD_UI["CSV Upload Interface"]
+    end
 
-    C --> L
-    E --> M
-    F --> N
-    G --> O
-    D --> Q
+    CSV --> LOADER
+    UPLOAD --> VALIDATOR
+    VALIDATOR --> LOADER
 
-    L --> R
-    M --> S
-    N --> T
-    O --> U
-    P --> V
-    P --> W
-    Q --> X
+    LOADER --> ANALYSIS
+    LOADER --> TURNING
+    LOADER --> REPLAY
+    ANALYSIS --> AI
+    TURNING --> AI
+
+    AI --> DEMO
+    AI --> GEMINI
+    GEMINI --> EVIDENCE
+    EVIDENCE --> AI
+
+    LOADER --> MATCH_API
+    ANALYSIS --> MATCH_API
+    TURNING --> INSIGHT_API
+    LOADER --> INSIGHT_API
+    REPLAY --> REPLAY_API
+    AI --> AI_API
+    VALIDATOR --> UPLOAD_API
+
+    MATCH_API --> DASHBOARD
+    MATCH_API --> STATS
+    INSIGHT_API --> INSIGHTS
+    REPLAY_API --> PLAYER
+    AI_API --> PERSONAS
+    AI_API --> QA
+    UPLOAD_API --> UPLOAD_UI
+
+    classDef data fill:#183153,stroke:#5B9BD5,color:#FFFFFF
+    classDef backend fill:#174D3A,stroke:#36A675,color:#FFFFFF
+    classDef ai fill:#49316B,stroke:#A78BFA,color:#FFFFFF
+    classDef api fill:#6B4515,stroke:#E5A54B,color:#FFFFFF
+    classDef ui fill:#164E63,stroke:#22B8CF,color:#FFFFFF
+
+    class CSV,UPLOAD data
+    class LOADER,VALIDATOR,ANALYSIS,TURNING,REPLAY,AI,EVIDENCE backend
+    class DEMO,GEMINI ai
+    class MATCH_API,INSIGHT_API,REPLAY_API,AI_API,UPLOAD_API api
+    class DASHBOARD,STATS,INSIGHTS,PLAYER,PERSONAS,QA,UPLOAD_UI ui
 ```
+
+### Architecture Notes
+
+- **Data layer:** Provides bundled synthetic match data and accepts custom CSV uploads.
+- **Backend core:** Validates event sequences, reconstructs match statistics, ranks turning points, and advances the synthetic replay.
+- **Narrative generation:** Uses deterministic DEMO responses or the optional Gemini provider, depending on backend configuration.
+- **Evidence validation:** Checks returned evidence IDs against available event records.
+- **REST API layer:** Exposes match data, analysis, replay, Q&A, and upload functionality.
+- **Frontend:** Presents the analysis through interactive dashboards, evidence cards, replay overlays, and personalized narratives.
+
+**Runtime note:** Gemini is optional. When the backend is running in DEMO mode, narrative generation uses the deterministic fallback instead.
+
 
 ### Component Responsibilities
 
