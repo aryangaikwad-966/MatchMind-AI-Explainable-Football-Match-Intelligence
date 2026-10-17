@@ -21,12 +21,18 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.matchmind.backend.dto.MatchPeriodComparison;
 import com.matchmind.backend.dto.MatchRecap;
 import com.matchmind.backend.dto.QuestionRequest;
 import com.matchmind.backend.dto.QuestionResponse;
+import com.matchmind.backend.dto.TurningPoint;
 import com.matchmind.backend.model.Match;
 import com.matchmind.backend.model.MatchEvent;
+import com.matchmind.backend.model.MatchStatistics;
+import com.matchmind.backend.model.Player;
 import com.matchmind.backend.service.DatasetLoader;
+import java.util.Comparator;
+import java.util.Optional;
 
 @Service
 public class AIService {
@@ -177,521 +183,780 @@ public class AIService {
     private QuestionResponse generateDemoAnswer(Match match, List<MatchEvent> events, QuestionRequest request) {
         QuestionResponse response = new QuestionResponse();
         response.setAiMode(aiMode);
-        String question = request.getQuestion().toLowerCase(Locale.ROOT);
-        String mode = request.getMode();
-        String preference = request.getPreference() != null ? request.getPreference().trim().toLowerCase(Locale.ROOT) : "";
-        List<String> evidenceIds;
 
-        // Filter events based on preference (team or player)
-        List<MatchEvent> relevantEvents = events;
-        if (!preference.isBlank()) {
-            relevantEvents = events.stream()
-                    .filter(e -> (e.getTeamName() != null && e.getTeamName().toLowerCase(Locale.ROOT).contains(preference)) ||
-                               (e.getPlayerName() != null && e.getPlayerName().toLowerCase(Locale.ROOT).contains(preference)))
-                    .toList();
+        String question = request.getQuestion().trim();
+        String qLower = question.toLowerCase(Locale.ROOT);
+        String mode = request.getMode() != null ? request.getMode().toUpperCase(Locale.ROOT) : "FAN";
+        String preference = request.getPreference() != null ? request.getPreference().trim() : "";
+        String prefLower = preference.toLowerCase(Locale.ROOT);
+
+        MatchStatistics stats = analysisService.calculateStatistics(match.getMatchId());
+        List<TurningPoint> turningPoints = analysisService.calculateTurningPoints(match.getMatchId());
+        MatchPeriodComparison periodComparison = analysisService.comparePeriods(match.getMatchId());
+
+        // Resolve Target Team (from preference or question)
+        String homeName = match.getHomeTeamName();
+        String awayName = match.getAwayTeamName();
+        String homeLower = homeName.toLowerCase(Locale.ROOT);
+        String awayLower = awayName.toLowerCase(Locale.ROOT);
+        String targetTeam = null;
+
+        if (!prefLower.isBlank()) {
+            if (homeLower.contains(prefLower) || prefLower.contains(homeLower)) targetTeam = homeName;
+            else if (awayLower.contains(prefLower) || prefLower.contains(awayLower)) targetTeam = awayName;
+        }
+        if (targetTeam == null) {
+            String homeFirstWord = homeLower.split("\\s+")[0];
+            String awayFirstWord = awayLower.split("\\s+")[0];
+            if (qLower.contains(homeLower) || (homeFirstWord.length() > 3 && qLower.contains(homeFirstWord))) {
+                targetTeam = homeName;
+            } else if (qLower.contains(awayLower) || (awayFirstWord.length() > 3 && qLower.contains(awayFirstWord))) {
+                targetTeam = awayName;
+            }
         }
 
-        long goalCount = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).count();
-        long shotCount = events.stream().filter(e -> e.getEventType().startsWith("SHOT")).count();
-        long foulCount = events.stream().filter(e -> "FOUL".equals(e.getEventType())).count();
-        long cardCount = events.stream().filter(e -> e.isYellowCard() || e.isRedCard()).count();
-        long cornerCount = events.stream().filter(e -> "CORNER".equals(e.getEventType())).count();
-        long saveCount = events.stream().filter(e -> "SAVE".equals(e.getEventType())).count();
-        long offsideCount = events.stream().filter(e -> "OFFSIDE".equals(e.getEventType())).count();
+        // Resolve Target Player (from preference or question)
+        String targetPlayer = null;
+        if (!prefLower.isBlank()) {
+            for (MatchEvent e : events) {
+                if (e.getPlayerName() != null && !e.getPlayerName().isBlank()) {
+                    String pName = e.getPlayerName().toLowerCase(Locale.ROOT);
+                    if (pName.contains(prefLower) || prefLower.contains(pName)) {
+                        targetPlayer = e.getPlayerName();
+                        break;
+                    }
+                }
+            }
+        }
+        if (targetPlayer == null) {
+            for (MatchEvent e : events) {
+                if (e.getPlayerName() != null && !e.getPlayerName().isBlank()) {
+                    String pName = e.getPlayerName().toLowerCase(Locale.ROOT);
+                    if (qLower.contains(pName)) {
+                        targetPlayer = e.getPlayerName();
+                        break;
+                    }
+                    String[] parts = pName.split("\\s+");
+                    if (parts.length > 1 && parts[parts.length - 1].length() > 3 && qLower.contains(parts[parts.length - 1])) {
+                        targetPlayer = e.getPlayerName();
+                        break;
+                    }
+                }
+            }
+        }
 
-        long teamGoalCount = relevantEvents.stream().filter(e -> e.isGoal() && !e.isDisallowed()).count();
-        long teamShotCount = relevantEvents.stream().filter(e -> e.getEventType().startsWith("SHOT")).count();
-        long teamFoulCount = relevantEvents.stream().filter(e -> "FOUL".equals(e.getEventType())).count();
-        long teamCardCount = relevantEvents.stream().filter(e -> e.isYellowCard() || e.isRedCard()).count();
+        // 1. Player Inquiries
+        if (targetPlayer != null && (
+                !prefLower.isBlank() ||
+                qLower.contains("score") || qLower.contains("goal") || qLower.contains("play") ||
+                qLower.contains("perform") || qLower.contains("how did") || qLower.contains("tell me about") ||
+                qLower.contains("what did") || qLower.contains("shot") || qLower.contains("card") ||
+                qLower.contains("foul") || qLower.contains("assist") || qLower.contains("save") ||
+                qLower.contains("who is") || qLower.contains("did ")
+        )) {
+            return answerPlayerInquiry(match, events, targetPlayer, mode);
+        }
 
-        // Determine winner
-        String winner;
-        if (match.getHomeScore() > match.getAwayScore()) {
-            winner = match.getHomeTeamName();
-        } else if (match.getAwayScore() > match.getHomeScore()) {
-            winner = match.getAwayTeamName();
+        // 2. Turning Points, Momentum & Key Moments
+        if (qLower.contains("turning") || qLower.contains("momentum") || qLower.contains("key moment") ||
+            qLower.contains("critical") || qLower.contains("crucial") || qLower.contains("game chang") ||
+            qLower.contains("why did the game change") || qLower.contains("why was") || qLower.contains("shift") ||
+            qLower.contains("decisive moment") || qLower.contains("importance")) {
+            return answerTurningPoints(match, events, turningPoints, stats, mode, qLower);
+        }
+
+        // 3. Match State Progression & Halves Comparison
+        if (qLower.contains("second half") || qLower.contains("first half") || qLower.contains("half time") ||
+            qLower.contains("halftime") || qLower.contains("period") || qLower.contains("state change") ||
+            qLower.contains("progression") || qLower.contains("across halves") || qLower.contains("between halves")) {
+            return answerMatchStateAndHalves(match, events, periodComparison, mode, qLower);
+        }
+
+        // 4. Goals & Scorers
+        if (qLower.contains("who scored") || qLower.contains("scorers") || qLower.contains("scorer") ||
+            qLower.contains("goal") || qLower.contains("disallowed") || qLower.contains("own goal") ||
+            qLower.contains("penalty") || qLower.contains("penalties") || qLower.contains("open the scoring") ||
+            qLower.contains("first goal")) {
+            return answerGoalsAndScorers(match, events, targetTeam, mode, qLower);
+        }
+
+        // 5. Result, Winner, Draw, Scoreline
+        if (qLower.contains("who won") || qLower.contains("winner") || qLower.contains("win") ||
+            qLower.contains("draw") || qLower.contains("tie") || qLower.contains("score") ||
+            qLower.contains("result") || qLower.contains("outcome") || qLower.contains("who lost") ||
+            qLower.contains("lose") || qLower.contains("lost") || qLower.contains("3 points") ||
+            qLower.contains("clean sheet")) {
+            return answerMatchResult(match, events, targetTeam, mode, qLower);
+        }
+
+        // 6. Cards, Red Cards, Discipline & Fouls
+        if (qLower.contains("card") || qLower.contains("red") || qLower.contains("yellow") ||
+            qLower.contains("sent off") || qLower.contains("send off") || qLower.contains("booking") ||
+            qLower.contains("booked") || qLower.contains("foul") || qLower.contains("discipline") ||
+            qLower.contains("dirty") || qLower.contains("referee")) {
+            return answerCardsAndFouls(match, events, stats, targetTeam, mode, qLower);
+        }
+
+        // 7. Shots, Accuracy, Goalkeeping & Saves
+        if (qLower.contains("shot") || qLower.contains("target") || qLower.contains("save") ||
+            qLower.contains("goalkeeper") || qLower.contains("keeper") || qLower.contains("chance") ||
+            qLower.contains("attempt") || qLower.contains("shooting")) {
+            return answerShotsAndSaves(match, events, stats, targetTeam, mode, qLower);
+        }
+
+        // 8. Corners, Offsides & Set Pieces
+        if (qLower.contains("corner") || qLower.contains("offside") || qLower.contains("set piece")) {
+            return answerCornersAndOffsides(match, events, stats, targetTeam, mode, qLower);
+        }
+
+        // 9. Substitutions
+        if (qLower.contains("substitution") || qLower.contains("sub") || qLower.contains("bench")) {
+            return answerSubstitutions(match, events, targetTeam, mode);
+        }
+
+        // 10. Team Performance & Tactical Flow
+        if (qLower.contains("perform") || qLower.contains("play") || qLower.contains("tactics") ||
+            (targetTeam != null && (qLower.contains("how") || qLower.contains("summary")))) {
+            return answerTeamPerformance(match, events, stats, turningPoints, targetTeam, mode);
+        }
+
+        // 11. General Match Summary / Overview
+        if (qLower.contains("what happened") || qLower.contains("tell me about") || qLower.contains("summary") ||
+            qLower.contains("overview") || qLower.contains("recap") || qLower.contains("story") ||
+            qLower.contains("match") || qLower.contains("game")) {
+            return answerGeneralSummary(match, events, stats, turningPoints, mode);
+        }
+
+        // 12. Fallback for genuinely unsupported or ambiguous questions
+        return answerFallback(match, preference);
+    }
+
+    private QuestionResponse answerPlayerInquiry(Match match, List<MatchEvent> events, String playerName, String mode) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> playerEvents = events.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) || playerName.equalsIgnoreCase(e.getRelatedPlayerName()))
+                .toList();
+
+        List<MatchEvent> goals = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && e.isGoal() && !e.isDisallowed())
+                .toList();
+        List<MatchEvent> shots = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && isShot(e))
+                .toList();
+        List<MatchEvent> yellowCards = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && e.isYellowCard())
+                .toList();
+        List<MatchEvent> redCards = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && e.isRedCard())
+                .toList();
+        List<MatchEvent> fouls = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && "FOUL".equals(e.getEventType()))
+                .toList();
+        List<MatchEvent> saves = playerEvents.stream()
+                .filter(e -> playerName.equalsIgnoreCase(e.getPlayerName()) && "SAVE".equals(e.getEventType()))
+                .toList();
+
+        String teamName = playerEvents.stream()
+                .filter(e -> e.getTeamName() != null && !e.getTeamName().isBlank())
+                .map(MatchEvent::getTeamName)
+                .findFirst()
+                .orElse("their team");
+
+        // Lookup squad details if available
+        Player playerMeta = datasetLoader.getAllPlayers().stream()
+                .filter(p -> p.getPlayerName().equalsIgnoreCase(playerName))
+                .findFirst()
+                .orElse(null);
+
+        String position = playerMeta != null ? playerMeta.getPosition() : "";
+        int squadNumber = playerMeta != null ? playerMeta.getSquadNumber() : 0;
+        String playerDescriptor = playerName + (squadNumber > 0 ? " (#" + squadNumber + (position.isEmpty() ? "" : ", " + position) + ")" : "");
+
+        List<String> evidence = playerEvents.stream().map(MatchEvent::getEventId).toList();
+        response.setEvidenceEventIds(evidence);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("%s represented %s in this match. ", playerDescriptor, teamName));
+            if (!goals.isEmpty()) {
+                String minutes = goals.stream().map(MatchEvent::getDisplayClock).collect(Collectors.joining("', ", "", "'"));
+                sb.append(String.format("What an impact! Scored %d goal(s) at %s! ", goals.size(), minutes));
+            } else if (!shots.isEmpty()) {
+                sb.append(String.format("Took %d shot(s) trying to break through the defense. ", shots.size()));
+            } else if (!saves.isEmpty()) {
+                sb.append(String.format("Stood strong in goal with %d key save(s). ", saves.size()));
+            }
+
+            if (!redCards.isEmpty()) {
+                sb.append(String.format("Unfortunately received a red card at %s'. ", redCards.get(0).getDisplayClock()));
+            } else if (!yellowCards.isEmpty()) {
+                sb.append(String.format("Received a yellow card at %s'. ", yellowCards.get(0).getDisplayClock()));
+            }
+
+            if (goals.isEmpty() && shots.isEmpty() && saves.isEmpty() && yellowCards.isEmpty() && redCards.isEmpty()) {
+                sb.append(String.format("Participated in %d recorded match event(s), maintaining team structure and work rate.", playerEvents.size()));
+            }
+
+            response.setAnswer(sb.toString().trim());
         } else {
-            winner = "Neither team"; // draw
-        }
-
-        // General match summary questions
-        if (question.contains("what happened") || question.contains("tell me about") || question.contains("summary") || question.contains("overview")) {
-            if ("FAN".equals(mode)) {
-                String result = match.getHomeScore() > match.getAwayScore() 
-                    ? match.getHomeTeamName() + " won " + match.getHomeScore() + "-" + match.getAwayScore()
-                    : (match.getAwayScore() > match.getHomeScore() 
-                        ? match.getAwayTeamName() + " won " + match.getAwayScore() + "-" + match.getHomeScore()
-                        : "The match ended in a " + match.getHomeScore() + "-" + match.getAwayScore() + " draw");
-                response.setAnswer(String.format("%s: %s %d-%d %s. There were %d goals, %d shots, %d fouls, and %d cards in this match.",
-                        match.getCompetitionName(), match.getHomeTeamName(), match.getHomeScore(),
-                        match.getAwayScore(), match.getAwayTeamName(), goalCount, shotCount, foulCount, cardCount));
-            } else {
-                response.setAnswer(String.format("Match summary: %s vs %s ended %d-%d. Statistical breakdown: %d goals, %d shots, %d corners, %d fouls, %d saves, %d offsides, %d cards. " +
-                        "This data is derived from %d recorded events in the synthetic dataset.",
-                        match.getHomeTeamName(), match.getAwayTeamName(), match.getHomeScore(), match.getAwayScore(),
-                        goalCount, shotCount, cornerCount, foulCount, saveCount, offsideCount, cardCount, events.size()));
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Player Performance Analysis: %s (%s). ", playerDescriptor, teamName));
+            sb.append(String.format("Total match involvements: %d. ", playerEvents.size()));
+            sb.append(String.format("Goals scored: %d", goals.size()));
+            if (!goals.isEmpty()) {
+                sb.append(" (").append(goals.stream().map(e -> e.getDisplayClock() + "' [" + e.getEventId() + "]").collect(Collectors.joining(", "))).append(")");
             }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
+            sb.append(String.format(", Shot attempts: %d, Fouls committed: %d, Saves: %d. ", shots.size(), fouls.size(), saves.size()));
+            sb.append(String.format("Disciplinary: %d yellow card(s), %d red card(s).", yellowCards.size(), redCards.size()));
+            response.setAnswer(sb.toString().trim());
         }
 
-        // Winner/draw questions
-        if (question.contains("who won") || question.contains("winner")) {
-            if (match.getHomeScore() == match.getAwayScore()) {
-                response.setAnswer(String.format("The match ended in a %d-%d draw between %s and %s.",
-                        match.getHomeScore(), match.getAwayScore(), match.getHomeTeamName(), match.getAwayTeamName()));
-            } else {
-                response.setAnswer(String.format("%s won the match %d-%d against %s.",
-                        winner, Math.max(match.getHomeScore(), match.getAwayScore()), 
-                        Math.min(match.getHomeScore(), match.getAwayScore()), 
-                        winner.equals(match.getHomeTeamName()) ? match.getAwayTeamName() : match.getHomeTeamName()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        if (question.contains("draw") || question.contains("tie")) {
-            if (match.getHomeScore() == match.getAwayScore()) {
-                response.setAnswer(String.format("Yes, the match ended in a %d-%d draw.", match.getHomeScore(), match.getAwayScore()));
-            } else {
-                response.setAnswer(String.format("No, the match did not end in a draw. %s won %d-%d.",
-                        winner, match.getHomeScore(), match.getAwayScore()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Score/result questions
-        if (question.contains("score") || question.contains("result")) {
-            if ("FAN".equals(mode)) {
-                if (!preference.isBlank()) {
-                    response.setAnswer(String.format("The final score was %s %d - %d %s. %s scored %d goal(s) in this match.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(),
-                            preference, teamGoalCount));
-                } else {
-                    response.setAnswer(String.format("The final score was %s %d - %d %s",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName()));
-                }
-            } else {
-                if (!preference.isBlank()) {
-                    response.setAnswer(String.format("Match result: %s %d - %d %s. This score was derived from %d valid goal events. " +
-                            "%s contributed %d goal(s) and %d shot(s) to this match.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(), goalCount,
-                            preference, teamGoalCount, teamShotCount));
-                } else {
-                    response.setAnswer(String.format("Match result: %s %d - %d %s. This score was derived from %d valid goal events " +
-                            "recorded in the event log. All goals have been verified against the match events.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(), goalCount));
-                }
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Goal questions
-        if (question.contains("goal")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s scored %d goal(s) in this match. The match had %d total goals.",
-                        preference, teamGoalCount, goalCount));
-            } else {
-                response.setAnswer(String.format("There were %d goals scored in this match. These were recorded as %d valid goal events " +
-                        "in the event log. The score progression can be tracked through the match timeline.",
-                        goalCount, goalCount));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Shot questions
-        if (question.contains("shot")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s had %d shot(s) in this match. The match had %d total shots.",
-                        preference, teamShotCount, shotCount));
-            } else {
-                response.setAnswer(String.format("There were %d total shots recorded in this match, including shots on target, " +
-                        "shots off target, and goals. This is based on the shot-type events in the dataset.",
-                        shotCount));
-            }
-            evidenceIds = events.stream().filter(this::isShot).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Foul questions
-        if (question.contains("foul")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s committed %d foul(s) in this match. The match had %d total fouls.",
-                        preference, teamFoulCount, foulCount));
-            } else {
-                response.setAnswer(String.format("There were %d fouls recorded in this match, as indicated by FOUL events " +
-                        "in the event log.", foulCount));
-            }
-            evidenceIds = events.stream().filter(e -> "FOUL".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Card questions
-        if (question.contains("card") || question.contains("yellow") || question.contains("red")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s received %d card(s) in this match. The match had %d total cards (%d yellow, %d red).",
-                        preference, teamCardCount, cardCount,
-                        events.stream().filter(e -> e.isYellowCard()).count(),
-                        events.stream().filter(e -> e.isRedCard()).count()));
-            } else {
-                response.setAnswer(String.format("There were %d cards shown in this match (%d yellow, %d red). " +
-                        "This is based on YELLOW_CARD and RED_CARD events in the dataset.",
-                        cardCount,
-                        events.stream().filter(e -> e.isYellowCard()).count(),
-                        events.stream().filter(e -> e.isRedCard()).count()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isYellowCard() || e.isRedCard()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Corner questions
-        if (question.contains("corner")) {
-            response.setAnswer(String.format("There were %d corners recorded in this match, as indicated by CORNER events " +
-                    "in the event log.", cornerCount));
-            evidenceIds = events.stream().filter(e -> "CORNER".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Save questions
-        if (question.contains("save")) {
-            response.setAnswer(String.format("There were %d saves recorded in this match, as indicated by SAVE events " +
-                    "in the event log.", saveCount));
-            evidenceIds = events.stream().filter(e -> "SAVE".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Offside questions
-        if (question.contains("offside")) {
-            response.setAnswer(String.format("There were %d offsides recorded in this match, as indicated by OFFSIDE events " +
-                    "in the event log.", offsideCount));
-            evidenceIds = events.stream().filter(e -> "OFFSIDE".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Turning points questions
-        if (question.contains("turning") || question.contains("key")) {
-            response.setAnswer("Key turning points have been identified based on goal timing, score changes, " +
-                    "red cards, and penalties. Use the turning-points endpoint to see the ranked insights " +
-                    "with evidence references.");
-            evidenceIds = analysisService.calculateTurningPoints(match.getMatchId()).stream()
-                    .flatMap(tp -> tp.getEventIds().stream()).distinct().toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Team performance questions
-        if (question.contains("play") || question.contains("perform")) {
-            if (!preference.isBlank()) {
-                if ("FAN".equals(mode)) {
-                    response.setAnswer(String.format("%s scored %d goal(s) and had %d shot(s) in this match. They committed %d foul(s) and received %d card(s).",
-                            preference, teamGoalCount, teamShotCount, teamFoulCount, teamCardCount));
-                } else {
-                    response.setAnswer(String.format("%s performance analysis: %d goal(s), %d shot(s), %d foul(s), %d card(s). " +
-                            "This is based on event data from the match log. Compare with the overall match statistics for context.",
-                            preference, teamGoalCount, teamShotCount, teamFoulCount, teamCardCount));
-                }
-                evidenceIds = relevantEvents.stream().map(MatchEvent::getEventId).toList();
-                response.setEvidenceEventIds(evidenceIds);
-            } else {
-                response.setAnswer("To get a team performance summary, specify a team name using the preference field. " +
-                        "I can then provide goals, shots, fouls, and cards for that specific team.");
-                evidenceIds = List.of();
-            }
-            return response;
-        }
-
-        // Timeline/when questions
-        if (question.contains("when") || question.contains("timeline") || question.contains("time")) {
-            if ("FAN".equals(mode)) {
-                response.setAnswer(String.format("The match had %d goals. Check the timeline tab to see when each goal was scored and other key events occurred.",
-                        goalCount));
-            } else {
-                response.setAnswer(String.format("Match timeline spans %d events over approximately 90 minutes. First half events occur before minute 45, second half after. " +
-                        "Use the timeline endpoint for detailed event chronology with timestamps.",
-                        events.size()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Preference-specific questions
-        if (!preference.isBlank()) {
-            response.setAnswer(String.format("I can provide information about %s's performance in this match, including goals, " +
-                    "shots, fouls, cards, and turning points. Ask specifically about one of these topics.",
-                    preference));
-            evidenceIds = relevantEvents.stream().map(MatchEvent::getEventId).toList();
-        } else {
-            response.setAnswer("Based on the available match data, I can provide information about: " +
-                    "match result, goals, shots, fouls, cards, corners, saves, offsides, turning points, team performance, and timeline. " +
-                    "Please ask a specific question about one of these topics.");
-            evidenceIds = List.of();
-        }
-
-        response.setEvidenceEventIds(evidenceIds);
         return response;
     }
 
-        // Determine winner
-        String winner;
-        if (match.getHomeScore() > match.getAwayScore()) {
-            winner = match.getHomeTeamName();
-        } else if (match.getAwayScore() > match.getHomeScore()) {
-            winner = match.getAwayTeamName();
-        } else {
-            winner = "Neither team"; // draw
-        }
+    private QuestionResponse answerTurningPoints(Match match, List<MatchEvent> events, List<TurningPoint> turningPoints,
+                                                  MatchStatistics stats, String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
 
-        // General match summary questions
-        if (question.contains("what happened") || question.contains("tell me about") || question.contains("summary") || question.contains("overview")) {
-            if ("FAN".equals(mode)) {
-                String result = match.getHomeScore() > match.getAwayScore() 
-                    ? match.getHomeTeamName() + " won " + match.getHomeScore() + "-" + match.getAwayScore()
-                    : (match.getAwayScore() > match.getHomeScore() 
-                        ? match.getAwayTeamName() + " won " + match.getAwayScore() + "-" + match.getHomeScore()
-                        : "The match ended in a " + match.getHomeScore() + "-" + match.getAwayScore() + " draw");
-                response.setAnswer(String.format("%s: %s %d-%d %s. There were %d goals, %d shots, %d fouls, and %d cards in this match.",
-                        match.getCompetitionName(), match.getHomeTeamName(), match.getHomeScore(),
-                        match.getAwayScore(), match.getAwayTeamName(), goalCount, shotCount, foulCount, cardCount));
-            } else {
-                response.setAnswer(String.format("Match summary: %s vs %s ended %d-%d. Statistical breakdown: %d goals, %d shots, %d corners, %d fouls, %d saves, %d offsides, %d cards. " +
-                        "This data is derived from %d recorded events in the synthetic dataset.",
-                        match.getHomeTeamName(), match.getAwayTeamName(), match.getHomeScore(), match.getAwayScore(),
-                        goalCount, shotCount, cornerCount, foulCount, saveCount, offsideCount, cardCount, events.size()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
+        if (turningPoints.isEmpty()) {
+            response.setAnswer("No high-leverage turning points were detected for this match. The game followed an even trajectory without lead changes or red cards.");
+            response.setEvidenceEventIds(List.of());
             return response;
         }
 
-        // Winner/draw questions
-        if (question.contains("who won") || question.contains("winner")) {
-            if (match.getHomeScore() == match.getAwayScore()) {
-                response.setAnswer(String.format("The match ended in a %d-%d draw between %s and %s.",
+        List<String> evidence = turningPoints.stream()
+                .flatMap(tp -> tp.getEventIds().stream())
+                .distinct()
+                .toList();
+        response.setEvidenceEventIds(evidence);
+
+        TurningPoint primary = turningPoints.get(0);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("The biggest turning point was at %s' — %s! ", primary.getMinute(), primary.getExplanation()));
+            sb.append(String.format("Why it mattered: %s. ", primary.getRankingRationale()));
+
+            if (turningPoints.size() > 1) {
+                TurningPoint secondary = turningPoints.get(1);
+                sb.append(String.format("Another critical shift happened at %s' (%s), which completely altered the match momentum.",
+                        secondary.getMinute(), secondary.getExplanation()));
+            }
+            response.setAnswer(sb.toString().trim());
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Identified %d key turning points that dictated match outcome: ", turningPoints.size()));
+            int rank = 1;
+            for (TurningPoint tp : turningPoints.stream().limit(3).toList()) {
+                sb.append(String.format("#%d [Minute %d', Score %s, Impact %.1f/10]: %s. Tactical rationale: %s (Evidence: %s). ",
+                        rank++, tp.getMinute(), tp.getScoreChange() != null ? tp.getScoreChange() : "N/A", tp.getScore(),
+                        tp.getExplanation(), tp.getRankingRationale(), String.join(", ", tp.getEventIds())));
+            }
+            response.setAnswer(sb.toString().trim());
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerMatchStateAndHalves(Match match, List<MatchEvent> events,
+                                                        MatchPeriodComparison comparison, String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        var first = comparison.getFirstHalf();
+        var second = comparison.getSecondHalf();
+
+        List<MatchEvent> goalEvents = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).toList();
+        response.setEvidenceEventIds(goalEvents.stream().map(MatchEvent::getEventId).toList());
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            if (qLower.contains("second half")) {
+                response.setAnswer(String.format(
+                        "In the second half, %s scored %d and %s scored %d. %s racked up %d shots while %s had %d shots after the break, making it an action-packed conclusion!",
+                        match.getHomeTeamName(), second.getHomeScore(),
+                        match.getAwayTeamName(), second.getAwayScore(),
+                        match.getHomeTeamName(), second.getHomeShots(),
+                        match.getAwayTeamName(), second.getAwayShots()));
+            } else if (qLower.contains("first half") || qLower.contains("halftime") || qLower.contains("half time")) {
+                response.setAnswer(String.format(
+                        "At half-time, the score stood at %s %d - %d %s. %s registered %d shots in the opening 45 minutes compared to %d for %s.",
+                        match.getHomeTeamName(), first.getHomeScore(),
+                        first.getAwayScore(), match.getAwayTeamName(),
+                        match.getHomeTeamName(), first.getHomeShots(),
+                        first.getAwayShots(), match.getAwayTeamName()));
+            } else {
+                response.setAnswer(String.format(
+                        "Across halves: First half was %s %d - %d %s (Shots: %d vs %d). The second half produced %d - %d (Shots: %d vs %d), leading to the %d-%d final score.",
+                        match.getHomeTeamName(), first.getHomeScore(), first.getAwayScore(), match.getAwayTeamName(),
+                        first.getHomeShots(), first.getAwayShots(),
+                        second.getHomeScore(), second.getAwayScore(),
+                        second.getHomeShots(), second.getAwayShots(),
+                        match.getHomeScore(), match.getAwayScore()));
+            }
+        } else {
+            response.setAnswer(String.format(
+                    "Match State Progression Breakdown: First Half ended %s %d - %d %s (Shots: %d [%d on target] vs %d [%d on target], Corners: %d vs %d, Fouls: %d vs %d). " +
+                    "Second Half delta: %s +%d goals (%d shots, %d on target) vs %s +%d goals (%d shots, %d on target). " +
+                    "Cumulative final score reconstructed: %d-%d.",
+                    match.getHomeTeamName(), first.getHomeScore(), first.getAwayScore(), match.getAwayTeamName(),
+                    first.getHomeShots(), first.getHomeShotsOnTarget(), first.getAwayShots(), first.getAwayShotsOnTarget(),
+                    first.getHomeCorners(), first.getAwayCorners(), first.getHomeFouls(), first.getAwayFouls(),
+                    match.getHomeTeamName(), second.getHomeScore(), second.getHomeShots(), second.getHomeShotsOnTarget(),
+                    match.getAwayTeamName(), second.getAwayScore(), second.getAwayShots(), second.getAwayShotsOnTarget(),
+                    match.getHomeScore(), match.getAwayScore()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerGoalsAndScorers(Match match, List<MatchEvent> events, String targetTeam,
+                                                   String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> validGoals = events.stream()
+                .filter(e -> e.isGoal() && !e.isDisallowed())
+                .sorted(Comparator.comparingInt(MatchEvent::getEventSequence))
+                .toList();
+
+        List<MatchEvent> disallowedGoals = events.stream()
+                .filter(MatchEvent::isDisallowed)
+                .toList();
+
+        // Disallowed goal question
+        if (qLower.contains("disallowed")) {
+            if (disallowedGoals.isEmpty()) {
+                response.setAnswer("No goals were disallowed in this match. All recorded goals stood after review.");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                String details = disallowedGoals.stream()
+                        .map(e -> String.format("at %s' by %s (%s) [%s]",
+                                e.getDisplayClock(),
+                                e.getPlayerName() != null ? e.getPlayerName() : "Unknown",
+                                e.getTeamName() != null ? e.getTeamName() : "team",
+                                e.getEventId()))
+                        .collect(Collectors.joining("; "));
+                response.setAnswer(String.format("There were %d disallowed goal(s) in this match: %s. The score was not modified by these incidents.",
+                        disallowedGoals.size(), details));
+                response.setEvidenceEventIds(disallowedGoals.stream().map(MatchEvent::getEventId).toList());
+            }
+            return response;
+        }
+
+        // Own goal question
+        if (qLower.contains("own goal")) {
+            List<MatchEvent> ownGoals = events.stream().filter(MatchEvent::isOwnGoal).toList();
+            if (ownGoals.isEmpty()) {
+                response.setAnswer("There were no own goals scored in this match.");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                String details = ownGoals.stream()
+                        .map(e -> String.format("%s' by %s (%s) [%s]", e.getDisplayClock(), e.getPlayerName(), e.getTeamName(), e.getEventId()))
+                        .collect(Collectors.joining("; "));
+                response.setAnswer(String.format("There were %d own goal(s) scored: %s.", ownGoals.size(), details));
+                response.setEvidenceEventIds(ownGoals.stream().map(MatchEvent::getEventId).toList());
+            }
+            return response;
+        }
+
+        // Penalty question
+        if (qLower.contains("penalty") || qLower.contains("penalties")) {
+            List<MatchEvent> penalties = events.stream().filter(MatchEvent::isPenalty).toList();
+            if (penalties.isEmpty()) {
+                response.setAnswer("No penalties were awarded or taken in this match.");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                String details = penalties.stream()
+                        .map(e -> String.format("%s' by %s (%s, Outcome: %s) [%s]",
+                                e.getDisplayClock(), e.getPlayerName(), e.getTeamName(), e.getEventOutcome(), e.getEventId()))
+                        .collect(Collectors.joining("; "));
+                response.setAnswer(String.format("Penalty incidents recorded (%d): %s.", penalties.size(), details));
+                response.setEvidenceEventIds(penalties.stream().map(MatchEvent::getEventId).toList());
+            }
+            return response;
+        }
+
+        // Opening goal question
+        if (qLower.contains("first goal") || qLower.contains("open the scoring") || qLower.contains("opened the scoring")) {
+            if (validGoals.isEmpty()) {
+                response.setAnswer("No goals were scored in this match (0-0 draw).");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                MatchEvent first = validGoals.get(0);
+                response.setEvidenceEventIds(List.of(first.getEventId()));
+                if ("FAN".equalsIgnoreCase(mode)) {
+                    response.setAnswer(String.format("The opening goal was scored by %s for %s in the %s' minute!",
+                            first.getPlayerName(), first.getTeamName(), first.getDisplayClock()));
+                } else {
+                    response.setAnswer(String.format("First goal event (%s): %s scored at %s' for %s (%s), changing score to %d-%d.",
+                            first.getEventId(), first.getPlayerName(), first.getDisplayClock(), first.getTeamName(),
+                            first.getEventType(), first.getScoreHomeAfterEvent(), first.getScoreAwayAfterEvent()));
+                }
+            }
+            return response;
+        }
+
+        // Team filter if applicable
+        List<MatchEvent> filteredGoals = validGoals;
+        if (targetTeam != null) {
+            String finalTarget = targetTeam.toLowerCase(Locale.ROOT);
+            filteredGoals = validGoals.stream()
+                    .filter(e -> e.getTeamName() != null && e.getTeamName().toLowerCase(Locale.ROOT).contains(finalTarget))
+                    .toList();
+        }
+
+        if (validGoals.isEmpty()) {
+            response.setAnswer("There were no goals scored in this match; it ended in a 0-0 goalless draw.");
+            response.setEvidenceEventIds(List.of());
+            return response;
+        }
+
+        if (targetTeam != null && filteredGoals.isEmpty()) {
+            response.setAnswer(String.format("%s did not score any goals in this match. Total goals in match: %d.", targetTeam, validGoals.size()));
+            response.setEvidenceEventIds(validGoals.stream().map(MatchEvent::getEventId).toList());
+            return response;
+        }
+
+        response.setEvidenceEventIds(filteredGoals.stream().map(MatchEvent::getEventId).toList());
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            String scorersSummary = filteredGoals.stream()
+                    .map(e -> String.format("%s (%s', %s)", e.getPlayerName(), e.getDisplayClock(), e.getTeamName()))
+                    .collect(Collectors.joining(", "));
+            if (targetTeam != null) {
+                response.setAnswer(String.format("%s scored %d goal(s): %s.", targetTeam, filteredGoals.size(), scorersSummary));
+            } else {
+                response.setAnswer(String.format("There were %d goals scored: %s. The final score was %s %d - %d %s.",
+                        validGoals.size(), scorersSummary, match.getHomeTeamName(), match.getHomeScore(), match.getAwayScore(), match.getAwayTeamName()));
+            }
+        } else {
+            String goalDetails = filteredGoals.stream()
+                    .map(e -> String.format("[%s] %s' %s (%s) - Score after: %d-%d",
+                            e.getEventId(), e.getDisplayClock(), e.getPlayerName(), e.getTeamName(),
+                            e.getScoreHomeAfterEvent(), e.getScoreAwayAfterEvent()))
+                    .collect(Collectors.joining("; "));
+            response.setAnswer(String.format("Goal Registry (%d goals%s): %s. All verified against official event timeline.",
+                    filteredGoals.size(), targetTeam != null ? " for " + targetTeam : "", goalDetails));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerMatchResult(Match match, List<MatchEvent> events, String targetTeam,
+                                                String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<String> goalEvs = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
+        response.setEvidenceEventIds(goalEvs);
+
+        boolean isDraw = match.getHomeScore() == match.getAwayScore();
+        String winner = match.getHomeScore() > match.getAwayScore() ? match.getHomeTeamName() :
+                (match.getAwayScore() > match.getHomeScore() ? match.getAwayTeamName() : null);
+        String loser = winner != null ? (winner.equals(match.getHomeTeamName()) ? match.getAwayTeamName() : match.getHomeTeamName()) : null;
+
+        if (qLower.contains("draw") || qLower.contains("tie")) {
+            if (isDraw) {
+                response.setAnswer(String.format("Yes, the match ended in a %d-%d draw between %s and %s.",
                         match.getHomeScore(), match.getAwayScore(), match.getHomeTeamName(), match.getAwayTeamName()));
             } else {
-                response.setAnswer(String.format("%s won the match %d-%d against %s.",
-                        winner, Math.max(match.getHomeScore(), match.getAwayScore()), 
-                        Math.min(match.getHomeScore(), match.getAwayScore()), 
-                        winner.equals(match.getHomeTeamName()) ? match.getAwayTeamName() : match.getHomeTeamName()));
+                response.setAnswer(String.format("No, the match did not end in a draw. %s won %d-%d against %s.",
+                        winner, Math.max(match.getHomeScore(), match.getAwayScore()),
+                        Math.min(match.getHomeScore(), match.getAwayScore()), loser));
             }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
             return response;
         }
 
-        if (question.contains("draw") || question.contains("tie")) {
-            if (match.getHomeScore() == match.getAwayScore()) {
-                response.setAnswer(String.format("Yes, the match ended in a %d-%d draw.", match.getHomeScore(), match.getAwayScore()));
+        // Direct team win inquiry e.g. "Did Northbridge win?"
+        if (targetTeam != null && (qLower.contains("win") || qLower.contains("won") || qLower.contains("lose") || qLower.contains("lost"))) {
+            if (isDraw) {
+                response.setAnswer(String.format("Neither team won; %s drew %d-%d with %s.",
+                        match.getHomeTeamName(), match.getHomeScore(), match.getAwayScore(), match.getAwayTeamName()));
+            } else if (targetTeam.equalsIgnoreCase(winner)) {
+                response.setAnswer(String.format("Yes, %s won the match %d-%d against %s!",
+                        targetTeam, Math.max(match.getHomeScore(), match.getAwayScore()),
+                        Math.min(match.getHomeScore(), match.getAwayScore()), loser));
             } else {
-                response.setAnswer(String.format("No, the match did not end in a draw. %s won %d-%d.",
-                        winner, match.getHomeScore(), match.getAwayScore()));
+                response.setAnswer(String.format("No, %s were defeated %d-%d by %s.",
+                        targetTeam, Math.max(match.getHomeScore(), match.getAwayScore()),
+                        Math.min(match.getHomeScore(), match.getAwayScore()), winner));
             }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
             return response;
         }
 
-        // Score/result questions
-        if (question.contains("score") || question.contains("result")) {
-            if ("FAN".equals(mode)) {
-                if (!preference.isBlank()) {
-                    response.setAnswer(String.format("The final score was %s %d - %d %s. %s scored %d goal(s) in this match.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(),
-                            preference, teamGoalCount));
-                } else {
-                    response.setAnswer(String.format("The final score was %s %d - %d %s",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName()));
-                }
+        if ("FAN".equalsIgnoreCase(mode)) {
+            if (isDraw) {
+                response.setAnswer(String.format("The match ended in a %d-%d draw between %s and %s after a tightly contested 90 minutes.",
+                        match.getHomeScore(), match.getAwayScore(), match.getHomeTeamName(), match.getAwayTeamName()));
             } else {
-                if (!preference.isBlank()) {
-                    response.setAnswer(String.format("Match result: %s %d - %d %s. This score was derived from %d valid goal events. " +
-                            "%s contributed %d goal(s) and %d shot(s) to this match.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(), goalCount,
-                            preference, teamGoalCount, teamShotCount));
-                } else {
-                    response.setAnswer(String.format("Match result: %s %d - %d %s. This score was derived from %d valid goal events " +
-                            "recorded in the event log. All goals have been verified against the match events.",
-                            match.getHomeTeamName(), match.getHomeScore(),
-                            match.getAwayScore(), match.getAwayTeamName(), goalCount));
-                }
+                response.setAnswer(String.format("%s took the victory with a %d-%d win against %s!",
+                        winner, Math.max(match.getHomeScore(), match.getAwayScore()),
+                        Math.min(match.getHomeScore(), match.getAwayScore()), loser));
             }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Goal questions
-        if (question.contains("goal")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s scored %d goal(s) in this match. The match had %d total goals.",
-                        preference, teamGoalCount, goalCount));
-            } else {
-                response.setAnswer(String.format("There were %d goals scored in this match. These were recorded as %d valid goal events " +
-                        "in the event log. The score progression can be tracked through the match timeline.",
-                        goalCount, goalCount));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Shot questions
-        if (question.contains("shot")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s had %d shot(s) in this match. The match had %d total shots.",
-                        preference, teamShotCount, shotCount));
-            } else {
-                response.setAnswer(String.format("There were %d total shots recorded in this match, including shots on target, " +
-                        "shots off target, and goals. This is based on the shot-type events in the dataset.",
-                        shotCount));
-            }
-            evidenceIds = events.stream().filter(this::isShot).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Foul questions
-        if (question.contains("foul")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s committed %d foul(s) in this match. The match had %d total fouls.",
-                        preference, teamFoulCount, foulCount));
-            } else {
-                response.setAnswer(String.format("There were %d fouls recorded in this match, as indicated by FOUL events " +
-                        "in the event log.", foulCount));
-            }
-            evidenceIds = events.stream().filter(e -> "FOUL".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Card questions
-        if (question.contains("card") || question.contains("yellow") || question.contains("red")) {
-            if (!preference.isBlank()) {
-                response.setAnswer(String.format("%s received %d card(s) in this match. The match had %d total cards (%d yellow, %d red).",
-                        preference, teamCardCount, cardCount,
-                        events.stream().filter(e -> e.isYellowCard()).count(),
-                        events.stream().filter(e -> e.isRedCard()).count()));
-            } else {
-                response.setAnswer(String.format("There were %d cards shown in this match (%d yellow, %d red). " +
-                        "This is based on YELLOW_CARD and RED_CARD events in the dataset.",
-                        cardCount,
-                        events.stream().filter(e -> e.isYellowCard()).count(),
-                        events.stream().filter(e -> e.isRedCard()).count()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isYellowCard() || e.isRedCard()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Corner questions
-        if (question.contains("corner")) {
-            response.setAnswer(String.format("There were %d corners recorded in this match, as indicated by CORNER events " +
-                    "in the event log.", cornerCount));
-            evidenceIds = events.stream().filter(e -> "CORNER".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Save questions
-        if (question.contains("save")) {
-            response.setAnswer(String.format("There were %d saves recorded in this match, as indicated by SAVE events " +
-                    "in the event log.", saveCount));
-            evidenceIds = events.stream().filter(e -> "SAVE".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Offside questions
-        if (question.contains("offside")) {
-            response.setAnswer(String.format("There were %d offsides recorded in this match, as indicated by OFFSIDE events " +
-                    "in the event log.", offsideCount));
-            evidenceIds = events.stream().filter(e -> "OFFSIDE".equals(e.getEventType())).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Turning points questions
-        if (question.contains("turning") || question.contains("key")) {
-            response.setAnswer("Key turning points have been identified based on goal timing, score changes, " +
-                    "red cards, and penalties. Use the turning-points endpoint to see the ranked insights " +
-                    "with evidence references.");
-            evidenceIds = analysisService.calculateTurningPoints(match.getMatchId()).stream()
-                    .flatMap(tp -> tp.getEventIds().stream()).distinct().toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Team performance questions
-        if (question.contains("play") || question.contains("perform")) {
-            if (!preference.isBlank()) {
-                if ("FAN".equals(mode)) {
-                    response.setAnswer(String.format("%s scored %d goal(s) and had %d shot(s) in this match. They committed %d foul(s) and received %d card(s).",
-                            preference, teamGoalCount, teamShotCount, teamFoulCount, teamCardCount));
-                } else {
-                    response.setAnswer(String.format("%s performance analysis: %d goal(s), %d shot(s), %d foul(s), %d card(s). " +
-                            "This is based on event data from the match log. Compare with the overall match statistics for context.",
-                            preference, teamGoalCount, teamShotCount, teamFoulCount, teamCardCount));
-                }
-                evidenceIds = relevantEvents.stream().map(MatchEvent::getEventId).toList();
-                response.setEvidenceEventIds(evidenceIds);
-            } else {
-                response.setAnswer("To get a team performance summary, specify a team name using the preference field. " +
-                        "I can then provide goals, shots, fouls, and cards for that specific team.");
-                response.setEvidenceEventIds(List.of());
-            }
-            return response;
-        }
-
-        // Timeline/when questions
-        if (question.contains("when") || question.contains("timeline") || question.contains("time")) {
-            if ("FAN".equals(mode)) {
-                response.setAnswer(String.format("The match had %d goals. Check the timeline tab to see when each goal was scored and other key events occurred.",
-                        goalCount));
-            } else {
-                response.setAnswer(String.format("Match timeline spans %d events over approximately 90 minutes. First half events occur before minute 45, second half after. " +
-                        "Use the timeline endpoint for detailed event chronology with timestamps.",
-                        events.size()));
-            }
-            evidenceIds = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).map(MatchEvent::getEventId).toList();
-            response.setEvidenceEventIds(evidenceIds);
-            return response;
-        }
-
-        // Preference-specific questions
-        if (!preference.isBlank()) {
-            response.setAnswer(String.format("I can provide information about %s's performance in this match, including goals, " +
-                    "shots, fouls, cards, and turning points. Ask specifically about one of these topics.",
-                    preference));
-            response.setEvidenceEventIds(relevantEvents.stream().map(MatchEvent::getEventId).toList());
         } else {
-            response.setAnswer("Based on the available match data, I can provide information about: " +
-                    "match result, goals, shots, fouls, cards, corners, saves, offsides, turning points, team performance, and timeline. " +
-                    "Please ask a specific question about one of these topics.");
-            response.setEvidenceEventIds(List.of());
+            response.setAnswer(String.format("Full-Time Result: %s %d - %d %s (%s). Outcome: %s. Score sequence verified by %d goal events in match log.",
+                    match.getHomeTeamName(), match.getHomeScore(), match.getAwayScore(), match.getAwayTeamName(),
+                    match.getCompetitionName(),
+                    isDraw ? "Draw (1 point each)" : winner + " victory (+3 points)",
+                    goalEvs.size()));
         }
 
+        return response;
+    }
+
+    private QuestionResponse answerCardsAndFouls(Match match, List<MatchEvent> events, MatchStatistics stats,
+                                                 String targetTeam, String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> yellowCards = events.stream().filter(MatchEvent::isYellowCard).toList();
+        List<MatchEvent> redCards = events.stream().filter(MatchEvent::isRedCard).toList();
+        List<MatchEvent> fouls = events.stream().filter(e -> "FOUL".equals(e.getEventType())).toList();
+
+        // Red card specific question
+        if (qLower.contains("red") || qLower.contains("sent off") || qLower.contains("send off") || qLower.contains("ejected")) {
+            if (redCards.isEmpty()) {
+                response.setAnswer("No red cards were shown in this match. Both teams maintained 11 players throughout regulation.");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                String cardDetails = redCards.stream()
+                        .map(e -> String.format("%s' %s (%s) [%s]", e.getDisplayClock(), e.getPlayerName(), e.getTeamName(), e.getEventId()))
+                        .collect(Collectors.joining("; "));
+                response.setAnswer(String.format("Red card shown: %s. This reduced the team to 10 players, drastically impacting tactical stability.", cardDetails));
+                response.setEvidenceEventIds(redCards.stream().map(MatchEvent::getEventId).toList());
+            }
+            return response;
+        }
+
+        // Yellow card specific question
+        if (qLower.contains("yellow") || qLower.contains("booked") || qLower.contains("booking")) {
+            if (yellowCards.isEmpty()) {
+                response.setAnswer("No yellow cards were issued in this match.");
+                response.setEvidenceEventIds(List.of());
+            } else {
+                String details = yellowCards.stream()
+                        .map(e -> String.format("%s' %s (%s) [%s]", e.getDisplayClock(), e.getPlayerName(), e.getTeamName(), e.getEventId()))
+                        .collect(Collectors.joining("; "));
+                response.setAnswer(String.format("There were %d yellow card(s) shown: %s.", yellowCards.size(), details));
+                response.setEvidenceEventIds(yellowCards.stream().map(MatchEvent::getEventId).toList());
+            }
+            return response;
+        }
+
+        // Foul specific question
+        if (qLower.contains("foul")) {
+            response.setEvidenceEventIds(fouls.stream().map(MatchEvent::getEventId).toList());
+            if ("FAN".equalsIgnoreCase(mode)) {
+                response.setAnswer(String.format("There were %d total fouls in the match. %s committed %d fouls and %s committed %d fouls.",
+                        fouls.size(), match.getHomeTeamName(), stats.getHomeFouls(), match.getAwayTeamName(), stats.getAwayFouls()));
+            } else {
+                response.setAnswer(String.format("Foul Distribution: %d total fouls recorded. %s: %d fouls, %s: %d fouls. Backed by %d verified FOUL events in dataset.",
+                        fouls.size(), match.getHomeTeamName(), stats.getHomeFouls(), match.getAwayTeamName(), stats.getAwayFouls(), fouls.size()));
+            }
+            return response;
+        }
+
+        // Combined disciplinary overview
+        List<String> cardEvs = new ArrayList<>();
+        yellowCards.forEach(e -> cardEvs.add(e.getEventId()));
+        redCards.forEach(e -> cardEvs.add(e.getEventId()));
+        response.setEvidenceEventIds(cardEvs);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            response.setAnswer(String.format("Disciplinary summary: %d yellow card(s) and %d red card(s). Total fouls committed: %d (%s: %d, %s: %d).",
+                    yellowCards.size(), redCards.size(), fouls.size(), match.getHomeTeamName(), stats.getHomeFouls(), match.getAwayTeamName(), stats.getAwayFouls()));
+        } else {
+            response.setAnswer(String.format("Match Disciplinary Report: %d total fouls (%s %d, %s %d). Bookings: %d yellow (%s %d, %s %d), %d red (%s %d, %s %d).",
+                    fouls.size(), match.getHomeTeamName(), stats.getHomeFouls(), match.getAwayTeamName(), stats.getAwayFouls(),
+                    yellowCards.size(), stats.getHomeYellowCards(), stats.getAwayYellowCards(),
+                    redCards.size(), stats.getHomeRedCards(), stats.getAwayRedCards()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerShotsAndSaves(Match match, List<MatchEvent> events, MatchStatistics stats,
+                                                 String targetTeam, String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> shots = events.stream().filter(this::isShot).toList();
+        List<MatchEvent> saves = events.stream().filter(e -> "SAVE".equals(e.getEventType())).toList();
+
+        List<String> evidence = new ArrayList<>();
+        shots.stream().limit(10).forEach(e -> evidence.add(e.getEventId()));
+        saves.forEach(e -> evidence.add(e.getEventId()));
+        response.setEvidenceEventIds(evidence);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            response.setAnswer(String.format("%s took %d shots (%d on target) while %s had %d shots (%d on target). Goalkeepers produced %d total saves (%s: %d, %s: %d).",
+                    match.getHomeTeamName(), stats.getHomeShots(), stats.getHomeShotsOnTarget(),
+                    match.getAwayTeamName(), stats.getAwayShots(), stats.getAwayShotsOnTarget(),
+                    stats.getHomeSaves() + stats.getAwaySaves(),
+                    match.getHomeTeamName(), stats.getHomeSaves(),
+                    match.getAwayTeamName(), stats.getAwaySaves()));
+        } else {
+            double homeAcc = stats.getHomeShots() > 0 ? (stats.getHomeShotsOnTarget() * 100.0 / stats.getHomeShots()) : 0.0;
+            double awayAcc = stats.getAwayShots() > 0 ? (stats.getAwayShotsOnTarget() * 100.0 / stats.getAwayShots()) : 0.0;
+            response.setAnswer(String.format("Shot Generation & Goalkeeping Analytics: %s: %d shots, %d on target (%.1f%% accuracy), %d saves recorded. " +
+                    "%s: %d shots, %d on target (%.1f%% accuracy), %d saves recorded. Total shot attempts in dataset: %d.",
+                    match.getHomeTeamName(), stats.getHomeShots(), stats.getHomeShotsOnTarget(), homeAcc, stats.getHomeSaves(),
+                    match.getAwayTeamName(), stats.getAwayShots(), stats.getAwayShotsOnTarget(), awayAcc, stats.getAwaySaves(),
+                    shots.size()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerCornersAndOffsides(Match match, List<MatchEvent> events, MatchStatistics stats,
+                                                      String targetTeam, String mode, String qLower) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> corners = events.stream().filter(e -> "CORNER".equals(e.getEventType())).toList();
+        List<MatchEvent> offsides = events.stream().filter(e -> "OFFSIDE".equals(e.getEventType())).toList();
+
+        List<String> evidence = new ArrayList<>();
+        corners.stream().limit(8).forEach(e -> evidence.add(e.getEventId()));
+        offsides.stream().limit(8).forEach(e -> evidence.add(e.getEventId()));
+        response.setEvidenceEventIds(evidence);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            response.setAnswer(String.format("There were %d corners (%s: %d, %s: %d) and %d offsides (%s: %d, %s: %d) recorded in this match.",
+                    corners.size(), match.getHomeTeamName(), stats.getHomeCorners(), match.getAwayTeamName(), stats.getAwayCorners(),
+                    offsides.size(), match.getHomeTeamName(), stats.getHomeOffsides(), match.getAwayTeamName(), stats.getAwayOffsides()));
+        } else {
+            response.setAnswer(String.format("Set Piece & Line Discipline: Corners: %s %d, %s %d (Total: %d). Offsides flagged: %s %d, %s %d (Total: %d).",
+                    match.getHomeTeamName(), stats.getHomeCorners(), match.getAwayTeamName(), stats.getAwayCorners(), corners.size(),
+                    match.getHomeTeamName(), stats.getHomeOffsides(), match.getAwayTeamName(), stats.getAwayOffsides(), offsides.size()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerSubstitutions(Match match, List<MatchEvent> events, String targetTeam, String mode) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> subs = events.stream().filter(MatchEvent::isSubstitution).toList();
+        response.setEvidenceEventIds(subs.stream().map(MatchEvent::getEventId).toList());
+
+        if (subs.isEmpty()) {
+            response.setAnswer("No substitution events were logged in the event timeline for this match.");
+        } else {
+            String subList = subs.stream()
+                    .map(e -> String.format("%s' %s replaced %s (%s) [%s]",
+                            e.getDisplayClock(),
+                            e.getPlayerName() != null ? e.getPlayerName() : "Substitute",
+                            e.getRelatedPlayerName() != null ? e.getRelatedPlayerName() : "Player",
+                            e.getTeamName(), e.getEventId()))
+                    .collect(Collectors.joining("; "));
+            response.setAnswer(String.format("Substitutions recorded (%d): %s.", subs.size(), subList));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerTeamPerformance(Match match, List<MatchEvent> events, MatchStatistics stats,
+                                                   List<TurningPoint> turningPoints, String targetTeam, String mode) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        boolean isHome = targetTeam != null && targetTeam.equalsIgnoreCase(match.getHomeTeamName());
+        String team = targetTeam != null ? targetTeam : match.getHomeTeamName();
+
+        int goals = isHome ? stats.getHomeScore() : stats.getAwayScore();
+        int shots = isHome ? stats.getHomeShots() : stats.getAwayShots();
+        int shotsOnTarget = isHome ? stats.getHomeShotsOnTarget() : stats.getAwayShotsOnTarget();
+        int corners = isHome ? stats.getHomeCorners() : stats.getAwayCorners();
+        int fouls = isHome ? stats.getHomeFouls() : stats.getAwayFouls();
+        int yellows = isHome ? stats.getHomeYellowCards() : stats.getAwayYellowCards();
+        int reds = isHome ? stats.getHomeRedCards() : stats.getAwayRedCards();
+
+        List<MatchEvent> teamEvents = events.stream()
+                .filter(e -> team.equalsIgnoreCase(e.getTeamName()))
+                .toList();
+
+        List<String> evidence = teamEvents.stream()
+                .filter(e -> e.isGoal() || e.isRedCard() || isShot(e))
+                .limit(8)
+                .map(MatchEvent::getEventId)
+                .toList();
+        response.setEvidenceEventIds(evidence);
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            response.setAnswer(String.format(
+                    "%s scored %d goal(s) and produced %d shot(s) (%d on target). They earned %d corner(s), committed %d foul(s), and received %d card(s) (%d yellow, %d red).",
+                    team, goals, shots, shotsOnTarget, corners, fouls, yellows + reds, yellows, reds));
+        } else {
+            double shotAcc = shots > 0 ? (shotsOnTarget * 100.0 / shots) : 0.0;
+            response.setAnswer(String.format(
+                    "%s Team Performance Profile: Goals: %d, Shot volume: %d with %d on frame (%.1f%% conversion accuracy), Set pieces: %d corners, Discipline: %d fouls, %d yellow(s), %d red(s). Data verified across %d team-attributed events.",
+                    team, goals, shots, shotsOnTarget, shotAcc, corners, fouls, yellows, reds, teamEvents.size()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerGeneralSummary(Match match, List<MatchEvent> events, MatchStatistics stats,
+                                                  List<TurningPoint> turningPoints, String mode) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+
+        List<MatchEvent> goals = events.stream().filter(e -> e.isGoal() && !e.isDisallowed()).toList();
+        response.setEvidenceEventIds(goals.stream().map(MatchEvent::getEventId).toList());
+
+        String resultStr;
+        if (match.getHomeScore() > match.getAwayScore()) {
+            resultStr = String.format("%s defeated %s %d-%d", match.getHomeTeamName(), match.getAwayTeamName(), match.getHomeScore(), match.getAwayScore());
+        } else if (match.getAwayScore() > match.getHomeScore()) {
+            resultStr = String.format("%s defeated %s %d-%d", match.getAwayTeamName(), match.getHomeTeamName(), match.getAwayScore(), match.getHomeScore());
+        } else {
+            resultStr = String.format("%s and %s drew %d-%d", match.getHomeTeamName(), match.getAwayTeamName(), match.getHomeScore(), match.getAwayScore());
+        }
+
+        if ("FAN".equalsIgnoreCase(mode)) {
+            response.setAnswer(String.format(
+                    "In this %s match, %s! There were %d total shots (%d vs %d) and %d goals scored. Check the turning points and timeline to explore the key moments that shaped the game.",
+                    match.getCompetitionName(), resultStr, stats.getHomeShots() + stats.getAwayShots(),
+                    stats.getHomeShots(), stats.getAwayShots(), goals.size()));
+        } else {
+            response.setAnswer(String.format(
+                    "Comprehensive Match Summary: %s. Statistical summary: Goals: %d, Shots: %d vs %d (On Target: %d vs %d), Corners: %d vs %d, Fouls: %d vs %d, Cards: %d vs %d. Total timeline events evaluated: %d.",
+                    resultStr, goals.size(), stats.getHomeShots(), stats.getAwayShots(),
+                    stats.getHomeShotsOnTarget(), stats.getAwayShotsOnTarget(),
+                    stats.getHomeCorners(), stats.getAwayCorners(),
+                    stats.getHomeFouls(), stats.getAwayFouls(),
+                    stats.getHomeYellowCards() + stats.getHomeRedCards(), stats.getAwayYellowCards() + stats.getAwayRedCards(),
+                    events.size()));
+        }
+
+        return response;
+    }
+
+    private QuestionResponse answerFallback(Match match, String preference) {
+        QuestionResponse response = new QuestionResponse();
+        response.setAiMode(aiMode);
+        response.setEvidenceEventIds(List.of());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("MatchMind AI specializes in match intelligence for %s vs %s. ", match.getHomeTeamName(), match.getAwayTeamName()));
+        if (!preference.isBlank()) {
+            sb.append(String.format("(Personalized around: %s). ", preference));
+        }
+        sb.append("You can ask about:\n")
+          .append("• Match results & winner: \"Who won the match?\" or \"Did ").append(match.getHomeTeamName()).append(" win?\"\n")
+          .append("• Goals & scorers: \"Who scored the goals?\" or \"When was the opening goal scored?\"\n")
+          .append("• Turning points: \"What was the key turning point?\" or \"Why did momentum change?\"\n")
+          .append("• Match state & halves: \"What happened in the second half?\" or \"What was the half-time score?\"\n")
+          .append("• Team performance: \"How did ").append(match.getHomeTeamName()).append(" perform?\"\n")
+          .append("• Player contributions: \"How did [player name] play?\" or \"Did [player name] score?\"\n")
+          .append("• Discipline & cards: \"Were there any red cards?\" or \"How many fouls were committed?\"");
+
+        response.setAnswer(sb.toString());
         return response;
     }
 

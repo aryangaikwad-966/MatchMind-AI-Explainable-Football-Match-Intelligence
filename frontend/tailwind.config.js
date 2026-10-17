@@ -6,6 +6,16 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['Outfit', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
+      boxShadow: {
+        'glow-green': '0 0 25px -5px rgba(34, 197, 94, 0.35)',
+        'glow-cyan': '0 0 25px -5px rgba(56, 189, 248, 0.35)',
+        'glow-card': '0 10px 30px -10px rgba(2, 6, 23, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.05)',
+      },
       colors: {
         navy: {
           50: '#f0f4f8',
