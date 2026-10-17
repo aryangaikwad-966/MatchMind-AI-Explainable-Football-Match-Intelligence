@@ -35,29 +35,31 @@ function Navigation() {
           </Link>
 
           {/* Navigation Links & Engine Badge */}
-          <div className="flex items-center space-x-3 sm:space-x-5">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <nav className="flex items-center bg-navy-900/90 border border-navy-700/80 rounded-xl p-1 shadow-inner" aria-label="Main navigation">
               <Link
                 to="/"
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-football-400 ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-football-400 ${
                   isMatches
                     ? 'bg-football-500 text-white shadow-md shadow-football-900/40'
                     : 'text-navy-200 hover:text-white hover:bg-navy-800'
                 }`}
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Matches</span>
               </Link>
               <Link
                 to="/upload"
-                className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-football-400 ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-football-400 ${
                   isUpload
                     ? 'bg-football-500 text-white shadow-md shadow-football-900/40'
                     : 'text-navy-200 hover:text-white hover:bg-navy-800'
                 }`}
               >
-                <Upload className="w-4 h-4" />
-                <span>Upload CSV</span>
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>
+                  <span className="hidden sm:inline">Upload </span>CSV
+                </span>
               </Link>
             </nav>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Clock,
@@ -38,6 +38,12 @@ type TabType = 'overview' | 'timeline' | 'turning' | 'replay' | 'ai';
 
 export default function MatchDetail() {
   const { matchId } = useParams<{ matchId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') as TabType | null;
+  const validTabs: TabType[] = ['overview', 'timeline', 'turning', 'replay', 'ai'];
+  const initialTab = urlTab && validTabs.includes(urlTab) ? urlTab : 'overview';
+  const initialMode = searchParams.get('mode') === 'ANALYST' ? 'ANALYST' : 'FAN';
+
   const [match, setMatch] = useState<Match | null>(null);
   const [statistics, setStatistics] = useState<MatchStatistics | null>(null);
   const [comparison, setComparison] = useState<MatchPeriodComparison | null>(null);
@@ -46,12 +52,28 @@ export default function MatchDetail() {
   const [recap, setRecap] = useState<MatchRecap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [mode, setMode] = useState<'FAN' | 'ANALYST'>('FAN');
+  const [activeTab, setActiveTabState] = useState<TabType>(initialTab);
+  const [mode, setModeState] = useState<'FAN' | 'ANALYST'>(initialMode);
   const [preference, setPreference] = useState('');
   const [replay, setReplay] = useState<ReplayState | null>(null);
   const [playing, setPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(700);
+
+  const setActiveTab = (tab: TabType) => {
+    setActiveTabState(tab);
+    setSearchParams(prev => {
+      prev.set('tab', tab);
+      return prev;
+    });
+  };
+
+  const setMode = (newMode: 'FAN' | 'ANALYST') => {
+    setModeState(newMode);
+    setSearchParams(prev => {
+      prev.set('mode', newMode);
+      return prev;
+    });
+  };
 
   useEffect(() => {
     if (matchId) {
@@ -168,22 +190,22 @@ export default function MatchDetail() {
   return (
     <div className="space-y-6 pb-12">
       {/* Top Breadcrumb & Quick Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-navy-200 hover:text-white bg-navy-800/80 hover:bg-navy-800 border border-navy-700 transition focus-visible:ring-2 focus-visible:ring-football-400"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-navy-200 hover:text-white bg-navy-800/80 hover:bg-navy-800 border border-navy-700 transition focus-visible:ring-2 focus-visible:ring-football-400 shrink-0"
           aria-label="Back to matches"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>All Matches</span>
         </Link>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${scenarioMeta.color}`}>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${scenarioMeta.color}`}>
             <ScenarioIcon className="w-3.5 h-3.5" />
             <span>{scenarioMeta.label}</span>
           </span>
           {match.isSynthetic && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-purple-500/10 text-purple-300 border border-purple-500/30">
+            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-purple-500/10 text-purple-300 border border-purple-500/30">
               SYNTHETIC ENGINE
             </span>
           )}
@@ -191,29 +213,29 @@ export default function MatchDetail() {
       </div>
 
       {/* Stadium Billboard Scoreboard */}
-      <div className="relative rounded-2xl overflow-hidden glass-panel border-navy-700 p-6 sm:p-8 pitch-pattern">
+      <div className="relative rounded-2xl overflow-hidden glass-panel border-navy-700 p-3.5 sm:p-8 pitch-pattern">
         {/* Ambient team color glows */}
         <div className={`absolute top-0 left-0 w-72 h-72 bg-gradient-to-br ${homeTheme.gradient} opacity-20 blur-3xl pointer-events-none`} />
         <div className={`absolute bottom-0 right-0 w-72 h-72 bg-gradient-to-tl ${awayTheme.gradient} opacity-20 blur-3xl pointer-events-none`} />
 
         <div className="relative z-10 flex flex-col items-center">
           {/* Competition & Meta bar */}
-          <div className="flex items-center gap-2 text-xs font-medium text-navy-300 mb-6 bg-navy-950/70 border border-navy-700/80 px-4 py-1.5 rounded-full backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] sm:text-xs font-medium text-navy-300 mb-3 sm:mb-6 bg-navy-950/80 border border-navy-700/80 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full backdrop-blur-md text-center max-w-full">
             <span className="text-football-400 font-semibold">{match.competitionName}</span>
             <span>•</span>
-            <span>{match.seasonLabel || 'Season 2025/26'}</span>
-            <span>•</span>
+            <span className="hidden xs:inline">{match.seasonLabel || 'Season 2025/26'}</span>
+            <span className="hidden xs:inline">•</span>
             <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-navy-400" />
+              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-navy-400" />
               {new Date(match.matchDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
           </div>
 
-          {/* Score & Teams Grid */}
-          <div className="w-full grid grid-cols-1 md:grid-cols-7 items-center gap-6">
+          {/* Desktop Score & Teams Grid (Visible on md+) */}
+          <div className="hidden md:grid w-full grid-cols-7 items-center gap-6">
             {/* Home Team */}
-            <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-end gap-4 text-center md:text-right">
-              <div className="order-2 md:order-1">
+            <div className="col-span-3 flex items-center justify-end gap-4 text-right">
+              <div>
                 <span className="text-xs uppercase tracking-wider font-semibold text-navy-400">Home</span>
                 <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-white tracking-tight">
                   {match.homeTeamName}
@@ -221,14 +243,14 @@ export default function MatchDetail() {
                 <p className="text-xs text-navy-300 font-mono mt-0.5">{match.homeTeamId}</p>
               </div>
               <div
-                className={`order-1 md:order-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${homeTheme.gradient} border-2 ${homeTheme.border} flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-white shadow-xl flex-shrink-0`}
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${homeTheme.gradient} border-2 ${homeTheme.border} flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-white shadow-xl flex-shrink-0`}
               >
                 {homeTheme.initials}
               </div>
             </div>
 
             {/* Score Centerpiece */}
-            <div className="md:col-span-1 flex flex-col items-center justify-center">
+            <div className="col-span-1 flex flex-col items-center justify-center">
               <div className="bg-navy-950/90 border border-navy-700/90 rounded-2xl px-6 py-3 shadow-2xl backdrop-blur-md flex items-center gap-3">
                 <span className={`text-4xl sm:text-5xl font-mono font-black ${match.homeScore > match.awayScore ? 'text-football-400' : 'text-white'}`}>
                   {match.homeScore}
@@ -245,7 +267,7 @@ export default function MatchDetail() {
             </div>
 
             {/* Away Team */}
-            <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-start gap-4 text-center md:text-left">
+            <div className="col-span-3 flex items-center justify-start gap-4 text-left">
               <div
                 className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${awayTheme.gradient} border-2 ${awayTheme.border} flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-white shadow-xl flex-shrink-0`}
               >
@@ -261,10 +283,56 @@ export default function MatchDetail() {
             </div>
           </div>
 
+          {/* Mobile Broadcast Scoreboard (Visible on < md) */}
+          <div className="md:hidden w-full flex items-center justify-between gap-1.5 py-1">
+            {/* Home Team */}
+            <div className="flex flex-col items-center text-center flex-1 min-w-0 px-1">
+              <div
+                className={`w-12 h-12 rounded-xl bg-gradient-to-br ${homeTheme.gradient} border-2 ${homeTheme.border} flex items-center justify-center font-display font-black text-lg text-white shadow-lg mb-1`}
+              >
+                {homeTheme.initials}
+              </div>
+              <h2 className="text-[11px] sm:text-xs font-display font-extrabold text-white tracking-tight leading-tight line-clamp-2">
+                {match.homeTeamName}
+              </h2>
+              <span className="text-[9px] uppercase tracking-wider font-semibold text-navy-400 mt-0.5">Home</span>
+            </div>
+
+            {/* Score Centerpiece */}
+            <div className="flex flex-col items-center justify-center px-1 shrink-0">
+              <div className="bg-navy-950/95 border border-navy-700 rounded-xl px-3 py-1 shadow-2xl backdrop-blur-md flex items-center gap-2">
+                <span className={`text-2xl sm:text-3xl font-mono font-black ${match.homeScore > match.awayScore ? 'text-football-400' : 'text-white'}`}>
+                  {match.homeScore}
+                </span>
+                <span className="text-base font-mono text-navy-500 font-light">:</span>
+                <span className={`text-2xl sm:text-3xl font-mono font-black ${match.awayScore > match.homeScore ? 'text-football-400' : 'text-white'}`}>
+                  {match.awayScore}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-navy-900 border border-navy-700 text-[9px] font-semibold text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{match.status}</span>
+              </div>
+            </div>
+
+            {/* Away Team */}
+            <div className="flex flex-col items-center text-center flex-1 min-w-0 px-1">
+              <div
+                className={`w-12 h-12 rounded-xl bg-gradient-to-br ${awayTheme.gradient} border-2 ${awayTheme.border} flex items-center justify-center font-display font-black text-lg text-white shadow-lg mb-1`}
+              >
+                {awayTheme.initials}
+              </div>
+              <h2 className="text-[11px] sm:text-xs font-display font-extrabold text-white tracking-tight leading-tight line-clamp-2">
+                {match.awayTeamName}
+              </h2>
+              <span className="text-[9px] uppercase tracking-wider font-semibold text-navy-400 mt-0.5">Away</span>
+            </div>
+          </div>
+
           {/* Goal Scorers Timeline Ticker */}
           {goalEvents.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-navy-700/80 w-full flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-              <span className="text-xs uppercase tracking-wider font-bold text-navy-400 flex items-center gap-1.5">
+            <div className="mt-4 sm:mt-6 pt-3.5 sm:pt-5 border-t border-navy-700/80 w-full flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5">
+              <span className="text-xs uppercase tracking-wider font-bold text-navy-400 flex items-center gap-1">
                 <span>⚽</span>
                 <span>Goals:</span>
               </span>
@@ -276,7 +344,7 @@ export default function MatchDetail() {
                     key={g.eventId}
                     href={`#event-${g.eventId}`}
                     onClick={() => setActiveTab('timeline')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-navy-900/90 hover:bg-navy-800 text-navy-200 hover:text-white border border-navy-700 transition"
+                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-navy-900/90 hover:bg-navy-800 text-navy-200 hover:text-white border border-navy-700 transition"
                     title={`Click to view goal at ${g.displayClock}`}
                   >
                     <span className="font-mono text-football-400 font-bold">{g.displayClock}</span>
@@ -296,13 +364,13 @@ export default function MatchDetail() {
 
       {/* Modern Segmented Navigation Tabs */}
       <div className="glass-panel border-navy-700/80 p-1.5 rounded-2xl" role="tablist" aria-label="Match views">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1">
+        <div className="flex md:grid md:grid-cols-5 gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none pb-0.5 md:pb-0">
           {[
-            { id: 'overview' as const, label: 'Overview & Stats', icon: BarChart3, count: null },
-            { id: 'timeline' as const, label: 'Timeline', icon: Clock, count: events.length },
-            { id: 'turning' as const, label: 'Turning Points', icon: TrendingUp, count: turningPoints.length },
-            { id: 'replay' as const, label: 'Synthetic Replay', icon: Play, count: 'Sim' },
-            { id: 'ai' as const, label: 'AI Match Intelligence', icon: Sparkles, count: recap?.aiMode || 'AI' },
+            { id: 'overview' as const, label: 'Overview & Stats', shortLabel: 'Overview', icon: BarChart3, count: null },
+            { id: 'timeline' as const, label: 'Timeline', shortLabel: 'Timeline', icon: Clock, count: events.length },
+            { id: 'turning' as const, label: 'Turning Points', shortLabel: 'Turning Points', icon: TrendingUp, count: turningPoints.length },
+            { id: 'replay' as const, label: 'Synthetic Replay', shortLabel: 'Replay', icon: Play, count: 'Sim' },
+            { id: 'ai' as const, label: 'AI Match Intelligence', shortLabel: 'AI Intelligence', icon: Sparkles, count: recap?.aiMode || 'AI' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -313,14 +381,15 @@ export default function MatchDetail() {
                 role="tab"
                 aria-selected={isActive}
                 aria-controls={`tabpanel-${tab.id}`}
-                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all focus-visible:ring-2 focus-visible:ring-football-400 ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 md:shrink whitespace-nowrap focus-visible:ring-2 focus-visible:ring-football-400 ${
                   isActive
                     ? 'bg-gradient-to-r from-football-500 to-emerald-600 text-white shadow-lg shadow-football-900/30 font-bold'
                     : 'text-navy-300 hover:text-white hover:bg-navy-800/60'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-navy-400'}`} />
-                <span>{tab.label}</span>
+                <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isActive ? 'text-white' : 'text-navy-400'}`} />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
                 {tab.count !== null && (
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
@@ -416,7 +485,7 @@ function OverviewTab({
   return (
     <div className="space-y-6">
       {/* Primary Match Stat Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
         <SummaryMetric
           title="Total Shots"
           homeValue={statistics.homeShots}
@@ -444,7 +513,7 @@ function OverviewTab({
       </div>
 
       {/* Bilateral Comparison Panel */}
-      <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
         <div className="flex items-center justify-between pb-4 border-b border-navy-700/80">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-football-500/10 border border-football-500/30 flex items-center justify-center text-football-400">
@@ -483,7 +552,7 @@ function OverviewTab({
 
       {/* Half-by-Half Tactical Shift (if available from API) */}
       {comparison && (
-        <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+        <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
           <div className="flex items-center gap-3 pb-4 border-b border-navy-700/80">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Activity className="w-5 h-5" />
@@ -551,19 +620,19 @@ function SummaryMetric({
   icon: any;
 }) {
   return (
-    <div className="glass-panel border-navy-700/80 rounded-xl p-5 hover:border-navy-600 transition">
-      <div className="flex items-center justify-between text-navy-400 mb-2">
-        <span className="text-xs uppercase tracking-wider font-semibold text-navy-300">{title}</span>
-        <Icon className="w-4 h-4 text-football-400" />
+    <div className="glass-panel border-navy-700/80 rounded-xl p-3 sm:p-5 hover:border-navy-600 transition">
+      <div className="flex items-center justify-between text-navy-400 mb-1.5 sm:mb-2">
+        <span className="text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-navy-300 truncate">{title}</span>
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-football-400 shrink-0" />
       </div>
       <div className="flex items-baseline justify-between">
         <div className="text-center">
-          <span className="text-2xl font-mono font-bold text-white">{homeValue}</span>
+          <span className="text-xl sm:text-2xl font-mono font-bold text-white">{homeValue}</span>
           <span className="text-[10px] block text-navy-400 uppercase mt-0.5 font-semibold">Home</span>
         </div>
-        <span className="text-sm text-navy-500 font-mono font-light">vs</span>
+        <span className="text-xs sm:text-sm text-navy-500 font-mono font-light">vs</span>
         <div className="text-center">
-          <span className="text-2xl font-mono font-bold text-white">{awayValue}</span>
+          <span className="text-xl sm:text-2xl font-mono font-bold text-white">{awayValue}</span>
           <span className="text-[10px] block text-navy-400 uppercase mt-0.5 font-semibold">Away</span>
         </div>
       </div>
@@ -666,7 +735,7 @@ function TimelineTab({
   }, [events, filterType, searchFilter]);
 
   return (
-    <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+    <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-5 border-b border-navy-700/80">
         <div>
@@ -832,7 +901,7 @@ function TurningPointsTab({
   onSelectEvent: () => void;
 }) {
   return (
-    <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+    <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
       <div className="pb-4 border-b border-navy-700/80">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-football-400" />
@@ -853,7 +922,7 @@ function TurningPointsTab({
             return (
               <div
                 key={tp.insightId}
-                className={`rounded-2xl p-6 border transition-all ${
+                className={`rounded-2xl p-4 sm:p-6 border transition-all ${
                   isTopDecider
                     ? 'bg-gradient-to-br from-football-950/40 via-navy-900 to-navy-900 border-football-500/50 shadow-lg shadow-football-950/50'
                     : 'bg-navy-900/80 border-navy-700/80 hover:border-navy-600'
@@ -968,7 +1037,7 @@ function ReplayTab({
   const progressPct = totalEvents === 0 ? 0 : Math.round((currentSequence / totalEvents) * 100);
 
   return (
-    <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+    <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
       {/* Header and Controls */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-5 border-b border-navy-700/80">
         <div>
@@ -1071,7 +1140,7 @@ function ReplayTab({
       </div>
 
       {/* Visual Simulated Football Pitch */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-emerald-950 via-emerald-900/60 to-emerald-950 border-2 border-emerald-800/60 p-6 min-h-[18rem] flex flex-col justify-between shadow-2xl">
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-emerald-950 via-emerald-900/60 to-emerald-950 border-2 border-emerald-800/60 p-3.5 sm:p-6 min-h-[16rem] sm:min-h-[18rem] flex flex-col justify-between shadow-2xl">
         {/* Pitch Field Markings (Center line, circle, penalty boxes) */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-emerald-600/30" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-emerald-600/30 pointer-events-none" />
@@ -1079,18 +1148,20 @@ function ReplayTab({
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-20 border-t-2 border-x-2 border-emerald-600/30 rounded-t-xl pointer-events-none" />
 
         {/* Pitch Top Bar: Simulated Score & Minute Billboard */}
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-2 bg-navy-950/90 border border-navy-700 px-4 py-2 rounded-xl backdrop-blur-md">
-            <span className={`w-3 h-3 rounded-full ${homeTheme.bg}`} />
-            <span className="text-xs font-bold text-white">{match.homeTeamName}</span>
-            <span className="font-mono text-base font-extrabold text-football-400 px-1">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-navy-950/90 border border-navy-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl backdrop-blur-md">
+            <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${homeTheme.bg}`} />
+            <span className="text-xs font-bold text-white hidden sm:inline">{match.homeTeamName}</span>
+            <span className="text-xs font-bold text-white sm:hidden">{homeTheme.initials}</span>
+            <span className="font-mono text-sm sm:text-base font-extrabold text-football-400 px-1">
               {replay?.homeScore ?? 0} : {replay?.awayScore ?? 0}
             </span>
-            <span className="text-xs font-bold text-white">{match.awayTeamName}</span>
-            <span className={`w-3 h-3 rounded-full ${awayTheme.bg}`} />
+            <span className="text-xs font-bold text-white sm:hidden">{awayTheme.initials}</span>
+            <span className="text-xs font-bold text-white hidden sm:inline">{match.awayTeamName}</span>
+            <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${awayTheme.bg}`} />
           </div>
 
-          <div className="bg-navy-950/90 border border-navy-700 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold text-emerald-300">
+          <div className="bg-navy-950/90 border border-navy-700 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold text-emerald-300">
             ⏱ {replay?.simulatedMinute ?? 0}' MINUTE
           </div>
         </div>
@@ -1221,7 +1292,7 @@ function AITab({
   return (
     <div className="space-y-6">
       {/* Explanation Mode Switcher Bar */}
-      <div className="glass-panel border-navy-700/80 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <span className="text-xs uppercase tracking-wider font-bold text-navy-400 block mb-1">
             Explainability Persona
@@ -1282,7 +1353,7 @@ function AITab({
       </div>
 
       {/* Match Recap Narrative */}
-      <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b border-navy-700/80">
           <div className="w-9 h-9 rounded-xl bg-football-500/10 border border-football-500/30 flex items-center justify-center text-football-400">
             <FileText className="w-5 h-5" />
@@ -1326,7 +1397,7 @@ function AITab({
       </div>
 
       {/* Natural Language Question & Answer Assistant */}
-      <div className="glass-panel border-navy-700/80 rounded-2xl p-6 sm:p-8 space-y-5">
+      <div className="glass-panel border-navy-700/80 rounded-2xl p-4 sm:p-8 space-y-5">
         <div className="flex items-center gap-3 pb-3 border-b border-navy-700/80">
           <div className="w-9 h-9 rounded-xl bg-football-500/10 border border-football-500/30 flex items-center justify-center text-football-400">
             <MessageSquare className="w-5 h-5" />

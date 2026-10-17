@@ -83,3 +83,12 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ── Hide scrollbars for pill strips on touch/mobile ── */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
