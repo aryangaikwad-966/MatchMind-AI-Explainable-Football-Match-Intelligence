@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Clock, Calendar, AlertCircle, Search, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { Trophy, Clock, Calendar, AlertCircle, Search, Sparkles, Filter, ChevronRight, Globe } from 'lucide-react';
 import apiClient from '../api/client';
 import type { Match } from '../types';
 
@@ -13,6 +13,8 @@ export default function MatchList() {
   const [aiMode, setAiMode] = useState<string>('DEMO');
   const [searchTerm, setSearchTerm] = useState('');
   const [scenarioFilter, setScenarioFilter] = useState<string>('ALL');
+  const [customApiUrl, setCustomApiUrl] = useState('');
+  const [isSavingUrl, setIsSavingUrl] = useState(false);
 
   useEffect(() => {
     loadMatches();
@@ -69,21 +71,96 @@ export default function MatchList() {
   }
 
   if (error) {
+    const currentBase = apiClient.getBaseUrl();
+    const isRelativeOnVercel = currentBase === '/api' && typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+
+    const handleSaveCustomUrl = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!customApiUrl.trim()) return;
+      setIsSavingUrl(true);
+      apiClient.setBaseUrl(customApiUrl.trim());
+      setError(null);
+      loadMatches().finally(() => setIsSavingUrl(false));
+    };
+
     return (
-      <div className="bg-red-950/40 border border-red-800/80 rounded-2xl p-8 max-w-2xl mx-auto shadow-xl">
-        <div className="flex items-start space-x-4">
-          <div className="p-3 bg-red-900/50 rounded-xl border border-red-700">
-            <AlertCircle className="w-7 h-7 text-red-400" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-red-300 font-display font-bold text-lg">Backend Connection Error</h3>
-            <p className="text-red-200 mt-1 text-sm leading-relaxed">{error}</p>
-            <button
-              onClick={loadMatches}
-              className="mt-4 px-4 py-2 bg-red-800 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition"
-            >
-              Retry Connection
-            </button>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="bg-navy-900/90 border border-red-800/80 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-sm">
+          <div className="flex items-start space-x-4">
+            <div className="p-3 bg-red-950/80 rounded-xl border border-red-800 shrink-0">
+              <AlertCircle className="w-7 h-7 text-red-400" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <h3 className="text-red-300 font-display font-bold text-lg">Backend Connection Error (404)</h3>
+                <p className="text-navy-300 text-sm mt-1 leading-relaxed">
+                  The frontend could not reach the backend API.
+                </p>
+                <div className="mt-2 text-xs text-navy-400 bg-navy-950/80 p-2.5 rounded-lg border border-navy-800 font-mono break-all">
+                  Targeted API URL: <span className="text-football-300 font-semibold">{currentBase}</span>
+                </div>
+              </div>
+
+              {isRelativeOnVercel && (
+                <div className="bg-navy-950/90 border border-navy-700/80 rounded-xl p-4 text-xs text-navy-200 space-y-2">
+                  <div className="flex items-center gap-2 text-football-400 font-semibold uppercase tracking-wider">
+                    <Globe className="w-4 h-4" />
+                    <span>Vercel Deployment Notice</span>
+                  </div>
+                  <p className="text-navy-300 leading-relaxed">
+                    Vercel hosts the frontend static files, so calls to <code className="text-football-300 bg-navy-900 px-1 py-0.5 rounded">/api/*</code> return 404 because the Spring Boot backend is hosted on Render.
+                  </p>
+                </div>
+              )}
+
+              {/* Instant Connect Box */}
+              <form onSubmit={handleSaveCustomUrl} className="pt-1 space-y-2">
+                <label className="block text-xs font-semibold text-navy-200">
+                  Enter your Render Backend URL to connect immediately:
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://your-backend.onrender.com"
+                    value={customApiUrl}
+                    onChange={(e) => setCustomApiUrl(e.target.value)}
+                    className="flex-1 px-3.5 py-2 text-sm bg-navy-950 border border-navy-700 rounded-lg text-white placeholder-navy-500 focus:outline-none focus:border-football-400 font-mono"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSavingUrl || !customApiUrl.trim()}
+                    className="px-5 py-2 bg-football-500 hover:bg-football-400 disabled:opacity-40 text-navy-950 text-sm font-bold rounded-lg transition shrink-0"
+                  >
+                    {isSavingUrl ? 'Connecting…' : 'Save & Connect'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-navy-400">
+                  Tip: Paste your Render web service URL (with or without <code className="text-navy-300">/api</code>).
+                </p>
+              </form>
+
+              <div className="pt-3 border-t border-navy-800 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={loadMatches}
+                  className="px-4 py-2 bg-navy-800 hover:bg-navy-700 text-white text-xs font-medium rounded-lg transition"
+                >
+                  Retry Connection
+                </button>
+                {typeof window !== 'undefined' && localStorage.getItem('matchmind_api_base_url') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      apiClient.setBaseUrl('');
+                      loadMatches();
+                    }}
+                    className="text-xs text-navy-400 hover:text-navy-200 underline"
+                  >
+                    Reset to default URL
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

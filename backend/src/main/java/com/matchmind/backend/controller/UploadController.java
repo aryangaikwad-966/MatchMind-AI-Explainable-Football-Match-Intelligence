@@ -27,7 +27,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "${cors.allowed-origins}")
+@CrossOrigin(originPatterns = {"${cors.allowed-origins}", "https://*.vercel.app", "https://*.onrender.com"})
 public class UploadController {
     private static final long MAX_BYTES = 10 * 1024 * 1024;
     private static final Set<String> EVENT_TYPES = Set.of("KICK_OFF", "HALF_TIME", "SECOND_HALF_START", "FULL_TIME", "PASS", "SHOT", "SHOT_ON_TARGET", "SHOT_OFF_TARGET", "GOAL", "GOAL_DISALLOWED", "OWN_GOAL", "PENALTY_AWARDED", "PENALTY_SCORED", "PENALTY_MISSED", "SAVE", "CORNER", "FOUL", "OFFSIDE", "RED_CARD", "YELLOW_CARD", "SUBSTITUTION");

@@ -11,16 +11,56 @@ import type {
   ReplayState
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080/api' : '/api');
+const normalizeApiUrl = (url?: string | null): string => {
+  if (!url || !url.trim()) {
+    return import.meta.env.DEV ? 'http://localhost:8080/api' : '/api';
+  }
+  let clean = url.trim().replace(/\/+$/, '');
+  if (!clean.endsWith('/api')) {
+    clean = `${clean}/api`;
+  }
+  return clean;
+};
+
+export const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('matchmind_api_base_url');
+    if (custom) return normalizeApiUrl(custom);
+  }
+  return normalizeApiUrl(import.meta.env.VITE_API_BASE_URL);
+};
+
+export const setCustomApiBaseUrl = (url: string) => {
+  if (typeof window !== 'undefined') {
+    if (!url || !url.trim()) {
+      localStorage.removeItem('matchmind_api_base_url');
+    } else {
+      localStorage.setItem('matchmind_api_base_url', normalizeApiUrl(url));
+    }
+  }
+};
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
+  return config;
+});
+
 export const apiClient = {
+  getBaseUrl(): string {
+    return getApiBaseUrl();
+  },
+
+  setBaseUrl(url: string) {
+    setCustomApiBaseUrl(url);
+  },
+
   // Health check
   async health() {
     const response = await api.get('/health');

@@ -17,7 +17,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "${cors.allowed-origins}")
+@CrossOrigin(originPatterns = {"${cors.allowed-origins}", "https://*.vercel.app", "https://*.onrender.com"})
 public class MatchController {
 
     private final DatasetLoader datasetLoader;
