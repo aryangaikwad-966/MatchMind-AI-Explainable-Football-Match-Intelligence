@@ -1,0 +1,74 @@
+{
+  "dataset_id": "matchmind-synthetic-v1",
+  "data_version": "1.0.0",
+  "generator_version": "1.0.0",
+  "is_synthetic": true,
+  "generated_at": "2026-10-15T00:00:00Z",
+  "generation_settings": {
+    "seed": 20261015,
+    "matches": 12,
+    "scenario_types": 12,
+    "squad_size": 18,
+    "starters": 11,
+    "max_substitutions_per_team": 4
+  },
+  "counts": {
+    "matches": 12,
+    "events": 1262,
+    "teams": 10,
+    "players": 180
+  },
+  "files": {
+    "matches.csv": {
+      "sha256": "50267254fbf5a9a790bd41c642dc78ddbcab7b4858b72f0bba3916841341fbee",
+      "rows": 12
+    },
+    "events.csv": {
+      "sha256": "5513c7de0d58601130f8f9fe9fa4286974d216b44c508c70f0d71601377e2de1",
+      "rows": 1262
+    },
+    "teams.csv": {
+      "sha256": "bd2d4c6125023f5680227b3e31df432961faa3526d6ebdb20b43367c4f013b1b",
+      "rows": 10
+    },
+    "players.csv": {
+      "sha256": "611765b945a20531a788c947952d20b5a75108bfd1ba57c26ae8694da1e12787",
+      "rows": 180
+    },
+    "event_types.csv": {
+      "sha256": "c0a20cf747ab1d9979a9862bff9bb892381dcd09bab6a51490d7c18f1a021b3e",
+      "rows": 21
+    },
+    "match_scenarios.csv": {
+      "sha256": "20ff88b609519004899f64f6b7f5e595b79918f150f28ab581fea6ceb949b163",
+      "rows": 12
+    },
+    "schema.json": {
+      "sha256": "75c557bd4031a931a74b9866d45e49895fabd892ff2e411430acdcb44290fc5f"
+    },
+    "README.md": {
+      "sha256": "343cd564f1b7303f79f665eface0419ff4d7a1a46778ea7ed1b3a309903fe621"
+    },
+    "fixtures/late_comeback.csv": {
+      "sha256": "14b8b7b35e4d7bbac450abdf9c042ec1bd8b718064b7e940ff16dcfd3f7422b9",
+      "rows": 112
+    },
+    "fixtures/late_winner.csv": {
+      "sha256": "b7d7cb72ec09c401b3a141554282eccad6cf9a0a75c237dfafe22d6d5d3c9094",
+      "rows": 98
+    },
+    "fixtures/red_card_turning_point.csv": {
+      "sha256": "1bbe3daf7f79c8ba163fae0d9b0095498504180ce7c1517e02e96b4337b92c76",
+      "rows": 104
+    },
+    "fixtures/goalless_draw.csv": {
+      "sha256": "fd17e53237978695d621d312140b5e7d77c65b1ba9130c05267fae464e2d1f6f",
+      "rows": 106
+    },
+    "fixtures/high_scoring_match.csv": {
+      "sha256": "cee0a2dbe0d08b87dd41cdaffa50b0419e2ae14b8a0b877479ef2d06e3d65c67",
+      "rows": 126
+    }
+  },
+  "regenerate": "python3 -m tools.synthetic_data.generate --seed 20261015"
+}

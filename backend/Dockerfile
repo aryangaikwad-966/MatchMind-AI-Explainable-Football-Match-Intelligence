@@ -25,12 +25,13 @@ COPY --from=build /app/target/matchmind-backend-1.0.0.jar app.jar
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 
-# Expose port
+# Expose port (Render automatically provides $PORT)
+ENV PORT=8080
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/health || exit 1
 
 # Run application
 ENTRYPOINT ["java", "-jar", "app.jar"]

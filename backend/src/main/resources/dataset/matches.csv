@@ -1,0 +1,13 @@
+match_id,dataset_id,is_synthetic,home_team_id,away_team_id,home_team_name,away_team_name,competition_name,season_label,match_date,scheduled_duration_minutes,status,home_score,away_score,scenario_type,data_version,first_half_stoppage_minutes,second_half_stoppage_minutes
+SYN-M001,matchmind-synthetic-v1,true,T-NBR,T-KNG,Northbridge FC,Kingsford United,Synthetic Football Showcase,SYN-2026/27,2026-08-15,90,COMPLETED,3,2,LATE_COMEBACK_VICTORY,1.0.0,2,5
+SYN-M002,matchmind-synthetic-v1,true,T-WHA,T-RMC,Westhaven Athletic,Redmont City,Synthetic Football Showcase,SYN-2026/27,2026-08-22,90,COMPLETED,1,0,NARROW_LATE_WINNER,1.0.0,1,5
+SYN-M003,matchmind-synthetic-v1,true,T-EMR,T-ASH,Eastmere Rovers,Ashbourne FC,Synthetic Football Showcase,SYN-2026/27,2026-08-29,90,COMPLETED,2,1,RED_CARD_TACTICAL_SHIFT,1.0.0,2,4
+SYN-M004,matchmind-synthetic-v1,true,T-SLV,T-BRK,Silvergate Town,Brookfield United,Synthetic Football Showcase,SYN-2026/27,2026-09-05,90,COMPLETED,0,0,GOALLESS_DRAW_WITH_CHANCES,1.0.0,3,4
+SYN-M005,matchmind-synthetic-v1,true,T-STH,T-CRS,Stonehaven Albion,Cresswick Rangers,Synthetic Football Showcase,SYN-2026/27,2026-09-12,90,COMPLETED,4,3,HIGH_SCORING_MOMENTUM_SWINGS,1.0.0,2,5
+SYN-M006,matchmind-synthetic-v1,true,T-ASH,T-STH,Ashbourne FC,Stonehaven Albion,Synthetic Football Showcase,SYN-2026/27,2026-09-19,90,COMPLETED,1,0,EARLY_GOAL_DEFENSIVE_HOLD,1.0.0,1,3
+SYN-M007,matchmind-synthetic-v1,true,T-BRK,T-WHA,Brookfield United,Westhaven Athletic,Synthetic Football Showcase,SYN-2026/27,2026-09-26,90,COMPLETED,2,0,TWO_LATE_GOALS_CLOSE_MATCH,1.0.0,2,4
+SYN-M008,matchmind-synthetic-v1,true,T-CRS,T-RMC,Cresswick Rangers,Redmont City,Synthetic Football Showcase,SYN-2026/27,2026-10-03,90,COMPLETED,1,1,PENALTY_GOAL_AND_RESPONSE,1.0.0,2,4
+SYN-M009,matchmind-synthetic-v1,true,T-NBR,T-SLV,Northbridge FC,Silvergate Town,Synthetic Football Showcase,SYN-2026/27,2026-10-10,90,COMPLETED,2,1,DISALLOWED_GOAL,1.0.0,2,4
+SYN-M010,matchmind-synthetic-v1,true,T-EMR,T-KNG,Eastmere Rovers,Kingsford United,Synthetic Football Showcase,SYN-2026/27,2026-10-17,90,COMPLETED,2,0,SUBSTITUTION_DECISIVE_SEQUENCE,1.0.0,1,4
+SYN-M011,matchmind-synthetic-v1,true,T-WHA,T-CRS,Westhaven Athletic,Cresswick Rangers,Synthetic Football Showcase,SYN-2026/27,2026-10-24,90,COMPLETED,0,2,UNDERDOG_VICTORY,1.0.0,2,3
+SYN-M012,matchmind-synthetic-v1,true,T-KNG,T-SLV,Kingsford United,Silvergate Town,Synthetic Football Showcase,SYN-2026/27,2026-10-31,90,COMPLETED,2,1,EARLY_LEAD_EQUALIZER_LATE_WINNER,1.0.0,1,5

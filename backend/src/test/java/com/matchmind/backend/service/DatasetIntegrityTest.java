@@ -25,4 +25,15 @@ class DatasetIntegrityTest {
                 + loader.getMatchEvents("SYN-M011").size()
                 + loader.getMatchEvents("SYN-M012").size());
     }
+
+    @Test
+    void datasetFallsBackToClasspathWhenFilesystemPathDoesNotExist() {
+        DatasetLoader loader = new DatasetLoader();
+        // Point to a non-existent path like Render's default container environment
+        ReflectionTestUtils.setField(loader, "datasetPath", "/nonexistent/path/on/render");
+        loader.loadDataset();
+        assertEquals(12, loader.getAllMatches().size());
+        assertEquals(10, loader.getAllTeams().size());
+        assertEquals(180, loader.getAllPlayers().size());
+    }
 }

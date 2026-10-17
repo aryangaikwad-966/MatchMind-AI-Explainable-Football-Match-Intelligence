@@ -13,8 +13,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
-import java.io.FileReader;
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
@@ -35,7 +41,7 @@ public class DatasetLoader {
     @PostConstruct
     public void loadDataset() {
         try {
-            logger.info("Loading dataset from: {}", datasetPath);
+            logger.info("Initializing dataset loader (configured path: '{}')", datasetPath);
             loadTeams();
             loadPlayers();
             loadMatches();
@@ -50,9 +56,48 @@ public class DatasetLoader {
         }
     }
 
+    private Reader getReader(String fileName) throws IOException {
+        // 1. If explicit datasetPath is configured and file exists on disk, load from filesystem
+        if (datasetPath != null && !datasetPath.isBlank()) {
+            Path path = Paths.get(datasetPath, fileName);
+            if (Files.isRegularFile(path)) {
+                logger.info("Loaded {} from filesystem: {}", fileName, path.toAbsolutePath());
+                return Files.newBufferedReader(path, StandardCharsets.UTF_8);
+            }
+        }
+
+        // 2. Classpath resource (bundled in JAR BOOT-INF/classes/dataset/ or target/classes/dataset/)
+        String classpathResource = "dataset/" + fileName;
+        InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource);
+        if (is == null) {
+            is = getClass().getClassLoader().getResourceAsStream("/" + classpathResource);
+        }
+        if (is != null) {
+            logger.info("Loaded {} from classpath resource: {}", fileName, classpathResource);
+            return new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+        }
+
+        // 3. Fallback relative directory checks
+        List<Path> fallbacks = List.of(
+                Paths.get("dataset", fileName),
+                Paths.get("..", "dataset", fileName),
+                Paths.get("../..", "dataset", fileName),
+                Paths.get("/app", "dataset", fileName)
+        );
+        for (Path fallback : fallbacks) {
+            if (Files.isRegularFile(fallback)) {
+                logger.info("Loaded {} from fallback filesystem path: {}", fileName, fallback.toAbsolutePath());
+                return Files.newBufferedReader(fallback, StandardCharsets.UTF_8);
+            }
+        }
+
+        throw new FileNotFoundException(String.format(
+                "Dataset file '%s' could not be found. Checked configured path '%s', classpath resource '%s', and filesystem fallbacks.",
+                fileName, datasetPath, classpathResource));
+    }
+
     private void loadTeams() throws IOException {
-        Path path = Paths.get(datasetPath, "teams.csv");
-        try (FileReader reader = new FileReader(path.toFile());
+        try (Reader reader = getReader("teams.csv");
              CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader)) {
 
             for (CSVRecord record : parser) {
@@ -72,8 +117,7 @@ public class DatasetLoader {
     }
 
     private void loadPlayers() throws IOException {
-        Path path = Paths.get(datasetPath, "players.csv");
-        try (FileReader reader = new FileReader(path.toFile());
+        try (Reader reader = getReader("players.csv");
              CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader)) {
 
             for (CSVRecord record : parser) {
@@ -93,8 +137,7 @@ public class DatasetLoader {
     }
 
     private void loadMatches() throws IOException {
-        Path path = Paths.get(datasetPath, "matches.csv");
-        try (FileReader reader = new FileReader(path.toFile());
+        try (Reader reader = getReader("matches.csv");
              CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader)) {
 
             for (CSVRecord record : parser) {
@@ -126,8 +169,7 @@ public class DatasetLoader {
     }
 
     private void loadEvents() throws IOException {
-        Path path = Paths.get(datasetPath, "events.csv");
-        try (FileReader reader = new FileReader(path.toFile());
+        try (Reader reader = getReader("events.csv");
              CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader)) {
 
             for (CSVRecord record : parser) {

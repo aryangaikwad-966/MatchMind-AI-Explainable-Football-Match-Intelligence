@@ -1,0 +1,11 @@
+team_id,team_name,short_name,home_ground,synthetic_seed_rank,is_synthetic,dataset_id
+T-NBR,Northbridge FC,NBR,Northbridge Park,1,true,matchmind-synthetic-v1
+T-KNG,Kingsford United,KNG,Kingsford Lane,2,true,matchmind-synthetic-v1
+T-WHA,Westhaven Athletic,WHA,Westhaven Common,3,true,matchmind-synthetic-v1
+T-RMC,Redmont City,RMC,Redmont Arena,4,true,matchmind-synthetic-v1
+T-EMR,Eastmere Rovers,EMR,Eastmere Meadow,5,true,matchmind-synthetic-v1
+T-ASH,Ashbourne FC,ASH,Ashbourne Road,6,true,matchmind-synthetic-v1
+T-SLV,Silvergate Town,SLV,Silvergate Yard,7,true,matchmind-synthetic-v1
+T-BRK,Brookfield United,BRK,Brookfield Green,8,true,matchmind-synthetic-v1
+T-STH,Stonehaven Albion,STH,Stonehaven Quay,9,true,matchmind-synthetic-v1
+T-CRS,Cresswick Rangers,CRS,Cresswick Fields,10,true,matchmind-synthetic-v1
