@@ -49,6 +49,8 @@ public class AIService {
     private final com.matchmind.backend.analysis.MatchAnalysisService analysisService;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private volatile String lastProviderStatus = "CONFIGURED_NOT_PROBED";
+    private volatile boolean liveRequestVerified;
 
     public AIService(DatasetLoader datasetLoader, com.matchmind.backend.analysis.MatchAnalysisService analysisService) {
         this.datasetLoader = datasetLoader;
@@ -65,7 +67,12 @@ public class AIService {
 
     public String getProviderStatus() {
         if (!"GEMINI".equalsIgnoreCase(aiMode)) return "DEMO";
-        return isProviderConfigured() ? "CONFIGURED_NOT_PROBED" : "NOT_CONFIGURED";
+        if (!isProviderConfigured()) return "NOT_CONFIGURED";
+        return lastProviderStatus;
+    }
+
+    public boolean hasVerifiedLiveRequest() {
+        return liveRequestVerified;
     }
 
     public MatchRecap generateMatchRecap(String matchId, String mode) {
@@ -82,7 +89,9 @@ public class AIService {
         if ("GEMINI".equalsIgnoreCase(aiMode)) {
             try {
                 recap = generateGeminiRecap(match, events, mode);
+                recordGeminiSuccess();
             } catch (Exception ex) {
+                recordGeminiFailure();
                 logger.warn("Gemini recap unavailable: {}", ex.getMessage());
                 recap = generateDemoRecap(match, events, mode);
                 // aiMode describes the generator of this response, not the configured provider.
@@ -170,7 +179,9 @@ public class AIService {
         if ("GEMINI".equalsIgnoreCase(aiMode)) {
             try {
                 response = generateGeminiAnswer(match, request);
+                recordGeminiSuccess();
             } catch (Exception ex) {
+                recordGeminiFailure();
                 logger.warn("Gemini Q&A unavailable: {}", ex.getMessage());
                 response = generateDemoAnswer(match, events, request);
                 // Keep per-response provenance accurate when Gemini is unavailable.
@@ -1053,8 +1064,35 @@ public class AIService {
                 .header("x-goog-api-key", geminiApiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body))).build();
         HttpResponse<String> result = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (result.statusCode() / 100 != 2) throw new IllegalStateException("Gemini HTTP " + result.statusCode() + ": " + result.body());
+        if (result.statusCode() / 100 != 2) {
+            logger.warn("Gemini API request failed: status={}, error={}", result.statusCode(), sanitizedGeminiError(result.body()));
+            throw new IllegalStateException("Gemini HTTP " + result.statusCode());
+        }
         return objectMapper.readTree(result.body());
+    }
+
+    private void recordGeminiSuccess() {
+        liveRequestVerified = true;
+        lastProviderStatus = "AVAILABLE";
+    }
+
+    private void recordGeminiFailure() {
+        liveRequestVerified = false;
+        lastProviderStatus = "UNAVAILABLE";
+    }
+
+    /** Extracts only Google's human-readable error message; never logs request data or credentials. */
+    private String sanitizedGeminiError(String responseBody) {
+        try {
+            String message = objectMapper.readTree(responseBody).path("error").path("message").asText("");
+            if (!message.isBlank()) {
+                String sanitized = message.replaceAll("[\\r\\n]+", " ").trim();
+                return sanitized.length() <= 500 ? sanitized : sanitized.substring(0, 500) + "…";
+            }
+        } catch (Exception ignored) {
+            // Fall through to a generic message for malformed provider error responses.
+        }
+        return "No provider error message supplied";
     }
 
     private String extractGeminiText(JsonNode response) {

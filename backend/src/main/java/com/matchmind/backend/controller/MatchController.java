@@ -38,7 +38,7 @@ public class MatchController {
                 "status", "UP",
                 "aiMode", aiService.getAiMode(),
                 "providerStatus", aiService.getProviderStatus(),
-                "liveRequestVerified", false,
+                "liveRequestVerified", aiService.hasVerifiedLiveRequest(),
                 "matchesLoaded", datasetLoader.getAllMatches().size()
         ));
     }

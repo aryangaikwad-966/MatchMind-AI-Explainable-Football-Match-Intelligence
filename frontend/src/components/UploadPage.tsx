@@ -29,6 +29,7 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,6 +37,7 @@ export default function UploadPage() {
     if (selectedFile) {
       setFile(selectedFile);
       setError(null);
+      setUploadErrors([]);
       setResult(null);
     }
   };
@@ -51,6 +53,7 @@ export default function UploadPage() {
       }
       setFile(droppedFile);
       setError(null);
+      setUploadErrors([]);
       setResult(null);
     }
   };
@@ -71,10 +74,12 @@ export default function UploadPage() {
     try {
       setUploading(true);
       setError(null);
+      setUploadErrors([]);
       const response = await apiClient.uploadMatch(file);
       setResult(response);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Upload failed. Check format and server status.');
+      setUploadErrors(Array.isArray(err.response?.data?.errors) ? err.response.data.errors : []);
     } finally {
       setUploading(false);
     }
@@ -84,6 +89,7 @@ export default function UploadPage() {
     setFile(null);
     setResult(null);
     setError(null);
+    setUploadErrors([]);
   };
 
   const downloadSampleCsv = () => {
@@ -265,6 +271,11 @@ export default function UploadPage() {
             <div>
               <p className="text-base font-bold text-red-300">Ingestion Error</p>
               <p className="text-sm text-red-200 mt-1">{error}</p>
+              {uploadErrors.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-red-200 list-disc list-inside">
+                  {uploadErrors.map((uploadError, index) => <li key={index}>{uploadError}</li>)}
+                </ul>
+              )}
             </div>
           </div>
           <button

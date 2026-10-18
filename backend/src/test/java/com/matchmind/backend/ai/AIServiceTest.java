@@ -32,6 +32,8 @@ class AIServiceTest {
 
         assertEquals("GEMINI", recap.getAiMode());
         assertEquals("Gemini-generated recap.", recap.getRecap());
+        assertEquals("AVAILABLE", service.getProviderStatus());
+        assertTrue(service.hasVerifiedLiveRequest());
     }
 
     @Test void failedGeminiRecapIsLabelledDemoBecauseFallbackGeneratedIt() throws Exception {
@@ -41,6 +43,8 @@ class AIServiceTest {
 
         assertEquals("DEMO", recap.getAiMode());
         assertTrue(recap.getRecap().contains("Northbridge FC won 3-2"));
+        assertEquals("UNAVAILABLE", service.getProviderStatus());
+        assertTrue(!service.hasVerifiedLiveRequest());
     }
 
     @Test void successfulGeminiAnswerIsLabelledGemini() throws Exception {
