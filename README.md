@@ -732,4 +732,4 @@ npm run build
 
 - **Author & Developer:** Aryan Gaikwad
 - **Development Tool Disclosure:** **GitHub Copilot** in Visual Studio Code was used as an AI-powered pair-programming and code-completion tool during development.
-- **Runtime AI Disclosure:** **Google Gemini** (`gemini-2.0-flash` / `gemini-3.8-flash`) is integrated as an optional server-side narrative provider with deterministic fallback. No Microsoft Foundry runtime SDKs or Azure cloud services are utilized in the current deployment.
+- **Runtime AI Disclosure:** **Google Gemini** (`gemini-2.0-flash` / `gemini-3.8-flash`) is an optional server-side narrative provider with deterministic fallback. **Microsoft Foundry integration is planned** for future AI-powered match insights.
