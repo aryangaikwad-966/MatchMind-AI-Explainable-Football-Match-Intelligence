@@ -3,20 +3,89 @@ package com.matchmind.backend.ai;
 import com.matchmind.backend.analysis.MatchAnalysisService;
 import com.matchmind.backend.dto.QuestionRequest;
 import com.matchmind.backend.service.DatasetLoader;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AIServiceTest {
     private AIService service;
+    private HttpServer geminiServer;
     @BeforeEach void setup() { DatasetLoader loader=new DatasetLoader(); ReflectionTestUtils.setField(loader,"datasetPath","../dataset"); loader.loadDataset(); service=new AIService(loader,new MatchAnalysisService(loader)); ReflectionTestUtils.setField(service,"aiMode","DEMO"); }
+    @AfterEach void tearDown() { if (geminiServer != null) geminiServer.stop(0); }
     @Test void homeWinRecapUsesHomeWinLanguage() { assertTrue(service.generateMatchRecap("SYN-M001","FAN").getRecap().contains("Northbridge FC won 3-2")); }
     @Test void awayWinRecapUsesAwayWinLanguage() { assertTrue(service.generateMatchRecap("SYN-M011","FAN").getRecap().contains("Cresswick Rangers won 2-0")); }
     @Test void drawRecapUsesDrawLanguage() { var recap=service.generateMatchRecap("SYN-M004","FAN"); assertTrue(recap.getRecap().contains("ended in a 0-0 draw")); assertTrue(recap.getFanExplanation().contains("draw")); assertTrue(!recap.getFanExplanation().contains("victory")); }
     @Test void deterministicQuestionOnlyCitesRelevantEvidence() { var request=new QuestionRequest(); request.setQuestion("How many fouls were recorded?"); request.setMode("FAN"); var response=service.answerQuestion("SYN-M001",request); assertTrue(response.getEvidenceEventIds().stream().allMatch(id -> id.contains("E") && !id.equals("SYN-M001-E0025"))); }
     @Test void invalidQuestionIsRejected() { var request=new QuestionRequest(); request.setQuestion(" "); request.setMode("FAN"); assertThrows(IllegalArgumentException.class, () -> service.answerQuestion("SYN-M001",request)); }
+
+    @Test void successfulGeminiRecapIsLabelledGemini() throws Exception {
+        configureGeminiServer(200, geminiSuccessPayload());
+
+        var recap = service.generateMatchRecap("SYN-M001", "FAN");
+
+        assertEquals("GEMINI", recap.getAiMode());
+        assertEquals("Gemini-generated recap.", recap.getRecap());
+    }
+
+    @Test void failedGeminiRecapIsLabelledDemoBecauseFallbackGeneratedIt() throws Exception {
+        configureGeminiServer(500, "{\"error\":{\"message\":\"provider unavailable\"}}");
+
+        var recap = service.generateMatchRecap("SYN-M001", "FAN");
+
+        assertEquals("DEMO", recap.getAiMode());
+        assertTrue(recap.getRecap().contains("Northbridge FC won 3-2"));
+    }
+
+    @Test void successfulGeminiAnswerIsLabelledGemini() throws Exception {
+        configureGeminiServer(200, geminiSuccessPayload());
+        var request = new QuestionRequest();
+        request.setQuestion("Who won?");
+        request.setMode("FAN");
+
+        var answer = service.answerQuestion("SYN-M001", request);
+
+        assertEquals("GEMINI", answer.getAiMode());
+        assertEquals("Gemini-generated recap.", answer.getAnswer());
+    }
+
+    @Test void failedGeminiAnswerIsLabelledDemoBecauseFallbackGeneratedIt() throws Exception {
+        configureGeminiServer(500, "{\"error\":{\"message\":\"provider unavailable\"}}");
+        var request = new QuestionRequest();
+        request.setQuestion("Who won the match?");
+        request.setMode("FAN");
+
+        var answer = service.answerQuestion("SYN-M001", request);
+
+        assertEquals("DEMO", answer.getAiMode());
+        assertTrue(answer.getAnswer().contains("Northbridge FC"));
+    }
+
+    private void configureGeminiServer(int status, String payload) throws Exception {
+        geminiServer = HttpServer.create(new InetSocketAddress(0), 0);
+        geminiServer.createContext("/models/test-model:generateContent", exchange -> {
+            byte[] response = payload.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        geminiServer.start();
+        ReflectionTestUtils.setField(service, "aiMode", "GEMINI");
+        ReflectionTestUtils.setField(service, "geminiApiKey", "test-key");
+        ReflectionTestUtils.setField(service, "geminiModel", "test-model");
+        ReflectionTestUtils.setField(service, "geminiBaseUrl", "http://localhost:" + geminiServer.getAddress().getPort());
+    }
+
+    private String geminiSuccessPayload() {
+        return "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"text\\\":\\\"Gemini-generated recap.\\\",\\\"evidenceEventIds\\\":[\\\"SYN-M001-E0001\\\"]}\"}]}}]}";
+    }
 
     @Test void answersWinnerQuestionAccurately() {
         var request = new QuestionRequest();

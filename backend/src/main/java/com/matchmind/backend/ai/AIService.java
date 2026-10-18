@@ -85,7 +85,9 @@ public class AIService {
             } catch (Exception ex) {
                 logger.warn("Gemini recap unavailable: {}", ex.getMessage());
                 recap = generateDemoRecap(match, events, mode);
-                recap.setAiMode("GEMINI_UNAVAILABLE");
+                // aiMode describes the generator of this response, not the configured provider.
+                // The fallback was produced by the deterministic DEMO engine.
+                recap.setAiMode("DEMO");
             }
         } else {
             recap = generateDemoRecap(match, events, mode);
@@ -171,7 +173,8 @@ public class AIService {
             } catch (Exception ex) {
                 logger.warn("Gemini Q&A unavailable: {}", ex.getMessage());
                 response = generateDemoAnswer(match, events, request);
-                response.setAiMode("GEMINI_UNAVAILABLE");
+                // Keep per-response provenance accurate when Gemini is unavailable.
+                response.setAiMode("DEMO");
             }
         } else {
             response = generateDemoAnswer(match, events, request);
