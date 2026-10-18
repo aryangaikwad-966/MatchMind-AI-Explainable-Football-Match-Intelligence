@@ -24,6 +24,17 @@ SYN-UPL-E004,SYN-UPL-02,4,78,35,4715,GOAL,T-KNG,P-202,Wynovan headers off corner
 SYN-UPL-E005,SYN-UPL-02,5,89,12,5352,GOAL,T-KNG,P-202,Wynovan stoppage time winner,true,false,1,2,T-NBR,T-KNG,Northbridge FC,Kingsford United
 `;
 
+const createSampleCsv = () => {
+  const matchId = `SYN-UPL-${Date.now()}`;
+  return SAMPLE_CSV_CONTENT
+    .split('SYN-UPL-02').join(matchId)
+    .split('SYN-UPL-E001').join(`${matchId}-E001`)
+    .split('SYN-UPL-E002').join(`${matchId}-E002`)
+    .split('SYN-UPL-E003').join(`${matchId}-E003`)
+    .split('SYN-UPL-E004').join(`${matchId}-E004`)
+    .split('SYN-UPL-E005').join(`${matchId}-E005`);
+};
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -93,7 +104,7 @@ export default function UploadPage() {
   };
 
   const downloadSampleCsv = () => {
-    const blob = new Blob([SAMPLE_CSV_CONTENT], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([createSampleCsv()], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -104,7 +115,7 @@ export default function UploadPage() {
   };
 
   const loadSampleIntoInput = () => {
-    const sampleFile = new File([SAMPLE_CSV_CONTENT], 'sample_matchmind_events.csv', { type: 'text/csv' });
+    const sampleFile = new File([createSampleCsv()], 'sample_matchmind_events.csv', { type: 'text/csv' });
     setFile(sampleFile);
     setError(null);
     setResult(null);
