@@ -143,63 +143,65 @@ Many hackathon prototypes rely on static dashboards or ungrounded chatbot widget
 
 ---
 
+
 ## 7. Visual Walkthrough & Screenshots
 
-All screenshots below are authentic captures from the running application.
+All screenshots below are authentic captures from the running application, arranged in a three-column grid for easier browsing.
 
-### 01 — Match Intelligence Dashboard
-![Match Intelligence Dashboard](docs/screenshots/01-dashboard.png)
-*Figure 1: Main match hub displaying 12 synthetic matches, scenario filters (`Comebacks`, `High Scoring`, `Red Cards`, `Draws`), and active AI engine badge (`DEMO`).*
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/01-dashboard.png"><img src="docs/screenshots/01-dashboard.png" alt="Match Intelligence Dashboard" width="280"></a><br>
+      <strong>01 — Match Intelligence Dashboard</strong><br>
+      <sub>Main match hub with 12 synthetic matches, scenario filters, and the active AI engine badge.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/02-match-analysis.png"><img src="docs/screenshots/02-match-analysis.png" alt="Match Analysis and Bilateral Statistics" width="280"></a><br>
+      <strong>02 — Match Analysis &amp; Bilateral Statistics</strong><br>
+      <sub>Head-to-head statistics, score banner, and first-half versus second-half dynamics.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/03-turning-points.png"><img src="docs/screenshots/03-turning-points.png" alt="Ranked Turning Points and Evidence Grounding" width="280"></a><br>
+      <strong>03 — Ranked Turning Points</strong><br>
+      <sub>Ranked pivotal moments with impact scores and supporting event IDs.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/04-match-replay.png"><img src="docs/screenshots/04-match-replay.png" alt="Evidence-to-Overlay Synthetic Replay" width="280"></a><br>
+      <strong>04 — Synthetic Replay</strong><br>
+      <sub>Event-by-event replay with sequence controls and on-pitch insight overlays.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/05-fan-mode.png"><img src="docs/screenshots/05-fan-mode.png" alt="Fan Persona Experience" width="280"></a><br>
+      <strong>05 — Fan Persona</strong><br>
+      <sub>Accessible, narrative-driven explanations of important match moments.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/06-analyst-mode.png"><img src="docs/screenshots/06-analyst-mode.png" alt="Analyst Persona Experience" width="280"></a><br>
+      <strong>06 — Analyst Persona</strong><br>
+      <sub>Detailed tactical breakdowns, metrics, and chronological match insights.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/07-ai-qa.png"><img src="docs/screenshots/07-ai-qa.png" alt="Grounded Natural Language Q&A" width="280"></a><br>
+      <strong>07 — Evidence-Grounded Q&amp;A</strong><br>
+      <sub>Match questions answered with references to supporting event records.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/08-data-ingestion.png"><img src="docs/screenshots/08-data-ingestion.png" alt="CSV Ingestion and Validation Pipeline" width="280"></a><br>
+      <strong>08 — CSV Ingestion</strong><br>
+      <sub>CSV upload interface with schema and event-sequence validation.</sub>
+    </td>
+    <td align="center" width="33%">
+      <a href="docs/screenshots/09-mobile-view.png"><img src="docs/screenshots/09-mobile-view.png" alt="Mobile Responsive View" width="280"></a><br>
+      <strong>09 — Mobile Responsive View</strong><br>
+      <sub>Responsive interface for mobile and second-screen match viewing.</sub>
+    </td>
+  </tr>
+</table>
 
----
-
-### 02 — Match Analysis & Bilateral Statistics
-![Match Analysis & Bilateral Statistics](docs/screenshots/02-match-analysis.png)
-*Figure 2: Head-to-head match console showing final score banner, shot conversion metrics, goalkeeper saves, and 1st vs 2nd half momentum dynamics.*
-
----
-
-### 03 — Ranked Turning Points & Evidence Grounding
-![Ranked Turning Points](docs/screenshots/03-turning-points.png)
-*Figure 3: Algorithmic turning-point engine surfacing ranked pivotal moments with numerical impact weights (e.g., 8.0/10 for Equalizer) and explicit event IDs (`#SYN-M001-E0099`).*
-
----
-
-### 04 — Evidence-to-Overlay Synthetic Replay
-![Synthetic Replay](docs/screenshots/04-match-replay.png)
-*Figure 4: Broadcast-style synthetic tactical replay with speed control, chronological sequence slider, and on-pitch event overlay telemetry.*
-
----
-
-### 05 — Fan Persona Experience
-![Fan Persona Experience](docs/screenshots/05-fan-mode.png)
-*Figure 5: Fan mode delivering emotional storytelling, conversational tone, and accessible explanations of pivotal game moments.*
-
----
-
-### 06 — Analyst Persona Experience
-![Analyst Persona Experience](docs/screenshots/06-analyst-mode.png)
-*Figure 6: Tactical Analyst breakdown displaying quantitative phase observations, defensive block metrics, and chronological goal registration.*
-
----
-
-### 07 — Grounded Natural Language Q&A
-![Grounded Q&A Interface](docs/screenshots/07-ai-qa.png)
-*Figure 7: Interactive Q&A console answering turning point inquiries with verified event evidence tags directly retrieved from the data layer.*
-
----
-
-### 08 — CSV Ingestion & Validation Pipeline
-![CSV Ingestion Pipeline](docs/screenshots/08-data-ingestion.png)
-*Figure 8: Drag-and-drop CSV upload portal enforcing strict schema checks, contiguous sequences, score reconstruction, and downloadable sample templates.*
-
----
-
-### 09 — Mobile Responsive View
-![Mobile Responsive View](docs/screenshots/09-mobile-view.png)
-*Figure 9: Fully responsive viewport layout optimized for handheld mobile devices and second-screen match viewing.*
-
----
 
 
 ## 8. System Architecture
