@@ -723,7 +723,7 @@ npm run build
 - **Public GitHub Repository:** [https://github.com/aryangaikwad-966/MatchMind-AI-Explainable-Football-Match-Intelligence](https://github.com/aryangaikwad-966/MatchMind-AI-Explainable-Football-Match-Intelligence)
 - **Public Working Frontend:** [https://match-mind-ai-explainable-football.vercel.app/](https://match-mind-ai-explainable-football.vercel.app/)
 - **Public Working Backend:** [https://matchmind-ai-explainable-football-6kp4.onrender.com](https://matchmind-ai-explainable-football-6kp4.onrender.com/)
-- **Demonstration Video:** *(Under 2 minutes, showcase real functioning app, public video URL to be linked in submission)*
+- **Demonstration Video:** [MatchMind_AI_Hackathon_Demo.mp4](MatchMind_AI_Hackathon_Demo.mp4) *(Under 2 minutes, showcase real functioning app)*
 - **Hackathon Category:** Main Hackathon Challenge / Grand Prize Track
 
 ---
